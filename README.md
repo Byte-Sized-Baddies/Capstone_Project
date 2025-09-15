@@ -4,10 +4,10 @@
 Team Name: Byte Sized Baddies  
 
 Team Members:
-- Yubina Acharya 
-- Kyathi Uyyala 
-- Mia Enamorado 
-- Brooke Mesch 
+- Yubina Acharya : yubinaacharya@my.unt.edu
+- Kyathi Uyyala : kyathiuyyala@my.unt.edu
+- Mia Enamorado : miaenamorado@my.unt.edu
+- Brooke Mesch : brookemesch@my.unt.edu
 
 ## Description
 Our project is focused on making a new To-Do list application. We want to indentify limitations of other To-Do list applications and see where we can make an application that has everything.

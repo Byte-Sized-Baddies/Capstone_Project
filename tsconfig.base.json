@@ -1,0 +1,31 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ESNext",
+        "moduleResolution": "Bundler",
+        "jsx": "react-jsx",
+        "strict": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "forceConsistentCasingInFileNames": true,
+        "baseUrl": ".",
+        "paths": {
+            "@repo/ui": [
+                "packages/ui/src"
+            ],
+            "@repo/hooks": [
+                "packages/hooks/src"
+            ],
+            "@repo/lib": [
+                "packages/lib/src"
+            ],
+            "@repo/data": [
+                "packages/data/src"
+            ],
+            "@repo/auth": [
+                "packages/auth/src"
+            ]
+        }
+    }
+}

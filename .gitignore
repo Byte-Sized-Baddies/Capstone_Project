@@ -1,0 +1,24 @@
+# node
+node_modules
+.pnp.cjs
+.pnp.loader.mjs
+
+# builds
+dist
+.next
+.build
+coverage
+
+# expo / RN
+.expo
+.expo-shared
+android/
+ios/
+
+# env
+.env
+.env.*
+*.local
+
+# macOS
+.DS_Store

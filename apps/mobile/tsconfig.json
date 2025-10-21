@@ -1,0 +1,32 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@repo/ui": [
+        "../../packages/ui/src"
+      ],
+      "@repo/hooks": [
+        "../../packages/hooks/src"
+      ],
+      "@repo/lib": [
+        "../../packages/lib/src"
+      ],
+      "@repo/data": [
+        "../../packages/data/src"
+      ],
+      "@repo/auth": [
+        "../../packages/auth/src"
+      ]
+    }
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ]
+}

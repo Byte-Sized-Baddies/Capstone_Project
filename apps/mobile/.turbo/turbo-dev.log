@@ -1,0 +1,22 @@
+
+> @repo/mobile@1.0.0 dev C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\apps\mobile
+> expo start -c
+
+env: load .env
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
+Starting project at C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\apps\mobile
+Starting Metro Bundler
+warning: Bundler cache is empty, rebuilding (this may take a minute)
+TypeError: fetch failed
+TypeError: fetch failed
+    at node:internal/deps/undici/undici:14900:13
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at fetchWithCredentials (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\api\rest\client.ts:98:24)
+    at cachedFetch (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\api\rest\cache\wrapFetchWithCache.ts:26:24)
+    at getNativeModuleVersionsAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\api\getNativeModuleVersions.ts:39:20)
+    at getVersionedNativeModulesAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\bundledNativeModules.ts:33:14)
+    at getCombinedKnownVersionsAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\getVersionedPackages.ts:58:7)
+    at getVersionedDependenciesAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\validateDependenciesVersions.ts:100:33)
+    at validateDependenciesVersionsAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\validateDependenciesVersions.ts:49:25)
+    at startAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\startAsync.ts:110:5)
+ ELIFECYCLE  Command failed with exit code 1.

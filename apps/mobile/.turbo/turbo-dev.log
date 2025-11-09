@@ -1,22 +1,71 @@
 
-> @repo/mobile@1.0.0 dev C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\apps\mobile
+> @repo/mobile@1.0.0 dev C:\Users\brook\Capstone_Project\apps\mobile
 > expo start -c
 
 env: load .env
-env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY
-Starting project at C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\apps\mobile
+env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
+Starting project at C:\Users\brook\Capstone_Project\apps\mobile
 Starting Metro Bundler
 warning: Bundler cache is empty, rebuilding (this may take a minute)
-TypeError: fetch failed
-TypeError: fetch failed
-    at node:internal/deps/undici/undici:14900:13
-    at processTicksAndRejections (node:internal/process/task_queues:105:5)
-    at fetchWithCredentials (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\api\rest\client.ts:98:24)
-    at cachedFetch (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\api\rest\cache\wrapFetchWithCache.ts:26:24)
-    at getNativeModuleVersionsAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\api\getNativeModuleVersions.ts:39:20)
-    at getVersionedNativeModulesAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\bundledNativeModules.ts:33:14)
-    at getCombinedKnownVersionsAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\getVersionedPackages.ts:58:7)
-    at getVersionedDependenciesAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\validateDependenciesVersions.ts:100:33)
-    at validateDependenciesVersionsAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\doctor\dependencies\validateDependenciesVersions.ts:49:25)
-    at startAsync (C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\node_modules\.pnpm\@expo+cli@54.0.12_expo-router@6.0.13_expo@54.0.16_react-native@0.81.4_@babel+core@7.28.4_@typ_wpinmyqbkkp2moalrk5impq43u\node_modules\@expo\cli\src\start\startAsync.ts:110:5)
- ELIFECYCLE  Command failed with exit code 1.
+The following packages should be updated for best compatibility with the installed expo version:
+  expo@54.0.20 - expected version: 54.0.23
+  expo-router@6.0.13 - expected version: ~6.0.14
+Waiting on http://localhost:8081
+  expo-web-browser@15.0.8 - expected version: ~15.0.9
+Logs for your project will appear below.
+Your project may not work correctly until you install the expected versions of the packages.
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+Web node_modules\expo-router\entry.js ▓▓░░░░░░░░░░░░░░ 16.0% ( 4/10)
+λ node_modules\expo-router\node\render.js ░░░░░░░░░░░░░░░░  5.9% ( 41/199)
+Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (16/32)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.0% (329/496)
+Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (113/279)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 57.6% (447/589)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 34.6% (216/367)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 68.6% (574/697)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓░░░░░░░░░░ 42.4% (398/611)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.4% (749/878)
+| Dynamic import at line 89: require(s). This module may not work as intended when deployed to a runtime.
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 59.4% (596/773)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.9% (895/989)
+| Dynamic import at line 135: require(s). This module may not work as intended when deployed to a runtime.
+| Dynamic import at line 43: require(s). This module may not work as intended when deployed to a runtime.
+| Dynamic import at line 11: require(s). This module may not work as intended when deployed to a runtime.
+| Dynamic import at line 22: require(s). This module may not work as intended when deployed to a runtime.
+| Dynamic import at line 20: require(s). This module may not work as intended when deployed to a runtime.
+| Dynamic import at line 38: require(s). This module may not work as intended when deployed to a runtime.
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 77.4% (825/938)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 90.9% (1047/1098)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.4% (1148/1169)
+λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1211/1211)
+λ Bundled 28443ms node_modules\expo-router\node\render.js (1211 modules)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\brook\Capstone_Project\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Web Bundled 31064ms node_modules\expo-router\entry.js (1188 modules)
+Web node_modules\expo-router\entry.js ▓▓▓░░░░░░░░░░░░░ 19.5% (25/58)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.9% (522/732)
+Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 75.0% ( 868/1002)
+Web Bundled 10141ms node_modules\expo-router\entry.js (1189 modules)
+ LOG  [web] Logs will appear in the browser console
+Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
+λ Bundled 68ms node_modules\expo-router\node\render.js (1 module)
+λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
+  console.warn (C:\Users\brook\Capstone_Project\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
+  warnOnce (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
+  createDOMProps (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
+  createElement (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
+  Component (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\View\index.js:111:23)
+  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
+  renderWithHooks (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
+  run (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
+  retryNode (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
+  renderNodeDestructive (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)

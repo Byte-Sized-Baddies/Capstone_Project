@@ -2,6 +2,12 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+## Environment Variables
+Environment Variables
+All `.env.local` variables live in the **root** directory of the monorepo.
+These are loaded manually in `apps/web/next.config.ts` using `dotenv`.
+
+
 First, run the development server:
 
 ```bash

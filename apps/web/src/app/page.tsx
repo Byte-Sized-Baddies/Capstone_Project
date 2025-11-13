@@ -1,5 +1,7 @@
 "use client";
+
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export const dynamic = "force-static";
 
@@ -8,6 +10,7 @@ export default function Home() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    // TODO: Integrate Supabase login here
     router.push("/dashboard");
   };
 
@@ -24,7 +27,9 @@ export default function Home() {
           <div className="w-20 h-20 rounded-full bg-[#f5e99f] flex items-center justify-center shadow-md">
             <span className="text-4xl">🐝</span>
           </div>
-          <h1 className="mt-4 text-3xl font-semibold text-[#1a1a1a]">Welcome to Do Bee</h1>
+          <h1 className="mt-4 text-3xl font-semibold text-[#1a1a1a]">
+            Welcome to Do Bee
+          </h1>
           <p className="text-gray-600 mt-2 text-sm">slogan?</p>
         </div>
 
@@ -56,9 +61,12 @@ export default function Home() {
         <div className="mt-5 text-center text-sm text-gray-700">
           <p>
             Don’t have an account?{" "}
-            <a href="#" className="underline hover:text-black font-medium">
+            <Link
+              href="/signup"
+              className="underline hover:text-black font-medium"
+            >
               Sign Up
-            </a>
+            </Link>
           </p>
           <p className="mt-2">
             <a href="#" className="text-[#1a1a1a] hover:underline">

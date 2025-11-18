@@ -1,57 +1,78 @@
-import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+// apps/mobile/app/(tabs)/_layout.tsx
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+// You might also need this import if using theming:
+// import Colors from '@/constants/Colors';
+// import { useColorScheme } from '@/components/useColorScheme';
 
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
-}
+
+// 🛑 1. Define the explicit order here
+export const unstable_settings = {
+  // Sets the initial tab when the app loads
+  initialRouteName: 'index', 
+  // Forces the tab bar to render in this exact sequence:
+  order: [
+    'index',      // 1st: Home (using index for the main landing page)
+    'projects',    // 2nd: Folders
+    'agenda',     // 3rd: Agenda
+    'calendar',   // 4th: Calendar
+  ],
+};
+
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  // const colorScheme = useColorScheme(); // Uncomment if needed for themes
 
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        // Set your active color here if you aren't using a theme hook
+        // tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
+        headerShown: false,
+      }}
+    >
+      {/* 1. Home Page */}
       <Tabs.Screen
-        name="index"
+        name="index" // Use index.tsx for the main page
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          title: 'Home', 
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="home-outline" size={size} color={color} />
           ),
         }}
       />
+      
+      {/* 2. Folders Page */}
       <Tabs.Screen
-        name="two"
+        name="projects" // Matches the folders.tsx filename
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          title: 'projects',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="folder-open-outline" size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* 3. Agenda Page */}
+      <Tabs.Screen
+        name="agenda" // Matches the agenda.tsx filename
+        options={{
+          title: 'Agenda',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="list-circle-outline" size={size} color={color} />
+          ),
+        }}
+      />
+      
+      {/* 4. Calendar View Page */}
+      <Tabs.Screen
+        name="calendar" // Matches the calendar.tsx filename
+        options={{
+          title: 'Calendar',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="calendar-outline" size={size} color={color} />
+          ),
         }}
       />
     </Tabs>

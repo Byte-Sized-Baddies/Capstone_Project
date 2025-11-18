@@ -1,17 +1,11 @@
 
-> web@0.1.0 dev C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\apps\web
+> web@0.1.0 dev /Users/mia/Desktop/do-bee/apps/web
 > next dev
 
-   ▲ Next.js 15.5.6
+   [1m[38;2;173;127;168m▲ Next.js 15.5.6[39m[22m
    - Local:        http://localhost:3000
-   - Network:      http://192.168.56.1:3000
-   - Environments: .env.local
+   - Network:      http://10.125.166.173:3000
 
- ✓ Starting...
-[Error: EINVAL: invalid argument, readlink 'C:\Users\brook\OneDrive\Documents\GitHub\Capstone_Project\apps\web\.next\server\interception-route-rewrite-manifest.js'] {
-  errno: -4071,
-  code: 'EINVAL',
-  syscall: 'readlink',
-  path: 'C:\\Users\\brook\\OneDrive\\Documents\\GitHub\\Capstone_Project\\apps\\web\\.next\\server\\interception-route-rewrite-manifest.js'
-}
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 1245ms
 [?25h

@@ -2,70 +2,102 @@
 > @repo/mobile@1.0.0 dev C:\Users\brook\Capstone_Project\apps\mobile
 > expo start -c
 
-env: load .env
-env: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY SUPABASE_SERVICE_ROLE_KEY
 Starting project at C:\Users\brook\Capstone_Project\apps\mobile
 Starting Metro Bundler
 warning: Bundler cache is empty, rebuilding (this may take a minute)
 The following packages should be updated for best compatibility with the installed expo version:
-  expo@54.0.20 - expected version: 54.0.23
-  expo-router@6.0.13 - expected version: ~6.0.14
+  expo@54.0.20 - expected version: ~54.0.24
+  expo-linking@8.0.8 - expected version: ~8.0.9
 Waiting on http://localhost:8081
-  expo-web-browser@15.0.8 - expected version: ~15.0.9
+  expo-router@6.0.13 - expected version: ~6.0.15
+  expo-splash-screen@31.0.10 - expected version: ~31.0.11
 Logs for your project will appear below.
+  expo-web-browser@15.0.8 - expected version: ~15.0.9
 Your project may not work correctly until you install the expected versions of the packages.
-Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
-Web node_modules\expo-router\entry.js ▓▓░░░░░░░░░░░░░░ 16.0% ( 4/10)
-λ node_modules\expo-router\node\render.js ░░░░░░░░░░░░░░░░  5.9% ( 41/199)
-Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (16/32)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓░░░░░░░░░ 44.0% (329/496)
-Web node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 25.0% (113/279)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 57.6% (447/589)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓░░░░░░░░░░░ 34.6% (216/367)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 68.6% (574/697)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓░░░░░░░░░░ 42.4% (398/611)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 74.4% (749/878)
-| Dynamic import at line 89: require(s). This module may not work as intended when deployed to a runtime.
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓░░░░░░░ 59.4% (596/773)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 81.9% (895/989)
-| Dynamic import at line 135: require(s). This module may not work as intended when deployed to a runtime.
-| Dynamic import at line 43: require(s). This module may not work as intended when deployed to a runtime.
-| Dynamic import at line 11: require(s). This module may not work as intended when deployed to a runtime.
-| Dynamic import at line 22: require(s). This module may not work as intended when deployed to a runtime.
-| Dynamic import at line 20: require(s). This module may not work as intended when deployed to a runtime.
-| Dynamic import at line 38: require(s). This module may not work as intended when deployed to a runtime.
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 77.4% (825/938)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 90.9% (1047/1098)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 96.4% (1148/1169)
-λ node_modules\expo-router\node\render.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 99.9% (1211/1211)
-λ Bundled 28443ms node_modules\expo-router\node\render.js (1211 modules)
-λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
-  console.warn (C:\Users\brook\Capstone_Project\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
-  warnOnce (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
-  createDOMProps (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
-  createElement (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
-  Component (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\View\index.js:111:23)
-  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
-  renderWithHooks (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
-  run (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
-  retryNode (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
-  renderNodeDestructive (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
-Web Bundled 31064ms node_modules\expo-router\entry.js (1188 modules)
-Web node_modules\expo-router\entry.js ▓▓▓░░░░░░░░░░░░░ 19.5% (25/58)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓░░░░░░░░ 50.9% (522/732)
-Web node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 75.0% ( 868/1002)
-Web Bundled 10141ms node_modules\expo-router\entry.js (1189 modules)
- LOG  [web] Logs will appear in the browser console
-Web node_modules\expo-router\entry.js ░░░░░░░░░░░░░░░░  0.0% (0/1)
-λ Bundled 68ms node_modules\expo-router\node\render.js (1 module)
-λ  WARN  props.pointerEvents is deprecated. Use style.pointerEvents 
-  console.warn (C:\Users\brook\Capstone_Project\node_modules\@expo\cli\src\start\server\serverLogLikeMetro.ts:161:21)
-  warnOnce (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\warnOnce\index.js:24:13)
-  createDOMProps (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\modules\createDOMProps\index.js:805:13)
-  createElement (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\createElement\index.js:23:32)
-  Component (C:\Users\brook\Capstone_Project\node_modules\react-native-web\dist\exports\View\index.js:111:23)
-  Object.callComponentInDEV [as react-stack-bottom-frame] (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:8970:18)
-  renderWithHooks (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:4699:19)
-  run (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5539:39)
-  retryNode (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5899:31)
-  renderNodeDestructive (C:\Users\brook\Capstone_Project\node_modules\react-dom\cjs\react-dom-server-legacy.node.development.js:5849:11)
+Networking has been disabled
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. Network connection is unreliable. Try again with the environment variable `EXPO_OFFLINE=1` to skip network requests..
+iOS node_modules\expo-router\entry.js ▓▓▓░░░░░░░░░░░░░ 19.8% ( 30/173)
+iOS node_modules\expo-router\entry.js ▓▓▓▓░░░░░░░░░░░░ 29.1% (224/415)
+iOS node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 67.5% (589/717)
+iOS node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓░░░░ 76.0% ( 869/1029)
+iOS node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓░░░ 85.4% (1134/1230)
+iOS node_modules\expo-router\entry.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓░░ 92.7% (1414/1469)
+iOS Bundled 21140ms node_modules\expo-router\entry.js (1503 modules)
+ WARN  Route "./(tabs)/login.tsx" is missing the required default export. Ensure a React component is exported as default.
+ WARN  Route "./(tabs)/signup.tsx" is missing the required default export. Ensure a React component is exported as default.
+ ERROR  [Error: Missing EXPO_PUBLIC_SUPABASE_URL] 
+
+Call Stack
+  <global> (apps\mobile\lib\supabaseClient.ts)
+  loadModuleImplementation (node_modules\@expo\cli\build\metro-require\require.js)
+  guardedLoadModule (node_modules\@expo\cli\build\metro-require\require.js)
+  metroRequire (node_modules\@expo\cli\build\metro-require\require.js)
+  <global> (apps\mobile\lib\auth.ts)
+  loadModuleImplementation (node_modules\@expo\cli\build\metro-require\require.js)
+  guardedLoadModule (node_modules\@expo\cli\build\metro-require\require.js)
+  metroRequire (node_modules\@expo\cli\build\metro-require\require.js)
+  <global> (apps\mobile\app\(tabs)\login.tsx)
+  loadModuleImplementation (node_modules\@expo\cli\build\metro-require\require.js)
+  guardedLoadModule (node_modules\@expo\cli\build\metro-require\require.js)
+  metroRequire (node_modules\@expo\cli\build\metro-require\require.js)
+  Object.defineProperties$argument_1.tabsLoginTsx.get (apps\mobile\app)
+  metroContext (apps\mobile\app)
+  node.loadRoute (node_modules\expo-router\build\getRoutesCore.js)
+  getDirectoryTree (node_modules\expo-router\build\getRoutesCore.js)
+  getDirectoryTree (node_modules\expo-router\build\getRoutesCore.js)
+  getRoutes (node_modules\expo-router\build\getRoutesCore.js)
+  getRoutes (node_modules\expo-router\build\getRoutes.js)
+  useStore (node_modules\expo-router\build\global-state\router-store.js)
+  ContextNavigator (node_modules\expo-router\build\ExpoRoot.js)
+  callComponent.reactStackBottomFrame (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  renderWithHooks (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  updateFunctionComponent (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  beginWork (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  runWithFiberInDEV (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performUnitOfWork (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  workLoopSync (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  renderRootSync (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performWorkOnRoot (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performWorkOnRootViaSchedulerTask (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js) 
+
+Call Stack
+  ExpoRoot (node_modules\expo-router\build\ExpoRoot.js)
+  App (node_modules\expo-router\build\qualified-entry.js)
+  WithDevTools (node_modules\expo\src\launch\withDevTools.ios.tsx)
+ ERROR  [Error: Missing EXPO_PUBLIC_SUPABASE_URL] 
+
+Call Stack
+  <global> (apps\mobile\lib\supabaseClient.ts)
+  loadModuleImplementation (node_modules\@expo\cli\build\metro-require\require.js)
+  guardedLoadModule (node_modules\@expo\cli\build\metro-require\require.js)
+  metroRequire (node_modules\@expo\cli\build\metro-require\require.js)
+  <global> (apps\mobile\lib\auth.ts)
+  loadModuleImplementation (node_modules\@expo\cli\build\metro-require\require.js)
+  guardedLoadModule (node_modules\@expo\cli\build\metro-require\require.js)
+  metroRequire (node_modules\@expo\cli\build\metro-require\require.js)
+  <global> (apps\mobile\app\(tabs)\login.tsx)
+  loadModuleImplementation (node_modules\@expo\cli\build\metro-require\require.js)
+  guardedLoadModule (node_modules\@expo\cli\build\metro-require\require.js)
+  metroRequire (node_modules\@expo\cli\build\metro-require\require.js)
+  Object.defineProperties$argument_1.tabsLoginTsx.get (apps\mobile\app)
+  metroContext (apps\mobile\app)
+  node.loadRoute (node_modules\expo-router\build\getRoutesCore.js)
+  getDirectoryTree (node_modules\expo-router\build\getRoutesCore.js)
+  getDirectoryTree (node_modules\expo-router\build\getRoutesCore.js)
+  getRoutes (node_modules\expo-router\build\getRoutesCore.js)
+  getRoutes (node_modules\expo-router\build\getRoutes.js)
+  useStore (node_modules\expo-router\build\global-state\router-store.js)
+  ContextNavigator (node_modules\expo-router\build\ExpoRoot.js)
+  callComponent.reactStackBottomFrame (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  renderWithHooks (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  updateFunctionComponent (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  beginWork (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  runWithFiberInDEV (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performUnitOfWork (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  workLoopSync (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  renderRootSync (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performWorkOnRoot (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js)
+  performWorkOnRootViaSchedulerTask (node_modules\react-native\Libraries\Renderer\implementations\ReactFabric-dev.js) 
+
+Call Stack
+  ExpoRoot (node_modules\expo-router\build\ExpoRoot.js)

@@ -1,6 +1,12 @@
 {
   "name": "@repo/mobile",
   "main": "expo-router/entry",
+
+  "expo": {
+    "entryPoint": "expo-router/entry",
+    "config": "app.config.js"
+  },
+
   "version": "1.0.0",
   "scripts": {
     "dev": "expo start -c",

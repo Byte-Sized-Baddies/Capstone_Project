@@ -1,7 +1,5 @@
 "use client";
 
-import FloatingMenu from "../components/FloatingMenu";
-
 export default function StatisticsPage() {
   return (
     <main className="min-h-screen bg-[#fffaf3] flex flex-col items-center justify-center relative overflow-hidden p-6">
@@ -82,9 +80,6 @@ export default function StatisticsPage() {
           </div>
         </div>
       </div>
-
-      <FloatingMenu />
     </main>
   );
 }
-

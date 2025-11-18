@@ -377,7 +377,6 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-extrabold">Do Bee</h2>
-            <p className="text-sm text-gray-600">Organize your day with a buzz</p>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
         </div>
@@ -417,13 +416,6 @@ export default function DashboardPage() {
 
         </nav>
 
-        <div className="mt-6 border-t pt-6">
-          <p className="text-xs text-gray-500">Notifications</p>
-          <div className="mt-2 flex items-center gap-2">
-            <button onClick={() => { if (Notification.permission === "default") Notification.requestPermission().then(p => { if (p === "granted") sendDueTodayNotifications(); }); else if (Notification.permission === "granted") sendDueTodayNotifications(); }} className="px-3 py-2 rounded-xl bg-white border">Enable / Check</button>
-            <button onClick={sendTestNotification} className="px-3 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>Send Test</button>
-          </div>
-        </div>
 
         <div className="mt-6">
           <h4 className="text-sm font-medium mb-2">Invited</h4>
@@ -469,7 +461,6 @@ export default function DashboardPage() {
         {/* Welcome */}
         <div className="mb-4">
           <h1 className="text-3xl font-bold">Your Tasks</h1>
-          <p className="text-sm text-gray-600 mt-1">Organize, mark progress, and invite teammates — all saved locally.</p>
         </div>
 
         {/* GRID */}

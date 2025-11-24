@@ -2,7 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { signUpWithEmail, signInWithOAuth } from "../lib/auth/auth";
+import { signUpWithEmail, signInWithOAuth } from "../auth/auth";
+
+// Optional Icons
+import { FcGoogle } from "react-icons/fc";
+import { FaApple, FaMicrosoft } from "react-icons/fa";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -31,9 +35,10 @@ export default function SignUpPage() {
     }
   };
 
-  const handleOAuthSignIn = async (provider: "google" | "github") => {
+  const handleOAuthSignIn = async (
+    provider: "google" | "apple" | "azure"
+  ) => {
     setErr(null);
-
     try {
       setLoading(true);
       const { error } = await signInWithOAuth(provider);
@@ -45,10 +50,13 @@ export default function SignUpPage() {
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-[#fffaf3] relative overflow-hidden">
+      {/* Background decoration */}
       <div className="absolute top-0 left-0 w-72 h-72 bg-[#f5e99f] rounded-full blur-3xl opacity-40"></div>
       <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#f5e99f] rounded-full blur-3xl opacity-30"></div>
 
       <div className="relative z-10 bg-white/90 backdrop-blur-md p-10 rounded-3xl shadow-xl w-full max-w-md border border-[#f5e99f]/60">
+        
+        {/* Header + Bee */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-20 h-20 rounded-full bg-[#f5e99f] flex items-center justify-center shadow-md">
             <span className="text-4xl">🐝</span>
@@ -59,6 +67,7 @@ export default function SignUpPage() {
           <p className="text-gray-600 mt-2 text-sm">Join Do Bee today!</p>
         </div>
 
+        {/* Inputs */}
         <div className="space-y-5">
           <input
             type="email"
@@ -95,18 +104,26 @@ export default function SignUpPage() {
 
           <hr className="my-4 border-[#f5e99f]" />
 
+          {/* OAuth Buttons */}
           <button
             onClick={() => handleOAuthSignIn("google")}
-            className="w-full p-3 rounded-2xl border border-[#f5e99f]"
+            className="w-full p-3 rounded-2xl border border-[#f5e99f] flex items-center justify-center gap-2"
           >
-            Continue with Google
+            <FcGoogle size={20} /> Continue with Google
           </button>
 
           <button
-            onClick={() => handleOAuthSignIn("github")}
-            className="w-full p-3 rounded-2xl border border-[#f5e99f]"
+            onClick={() => handleOAuthSignIn("apple")}
+            className="w-full p-3 rounded-2xl border border-[#f5e99f] flex items-center justify-center gap-2"
           >
-            Continue with GitHub
+            <FaApple size={20} /> Continue with Apple
+          </button>
+
+          <button
+            onClick={() => handleOAuthSignIn("azure")}
+            className="w-full p-3 rounded-2xl border border-[#f5e99f] flex items-center justify-center gap-2"
+          >
+            <FaMicrosoft size={20} /> Continue with Microsoft
           </button>
         </div>
 

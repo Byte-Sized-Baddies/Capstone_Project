@@ -12,9 +12,15 @@ export const signInWithEmail = async (email: string, password: string) => {
   return { data, error };
 };
 
-// OAuth login
-export const signInWithOAuth = async (provider: 'google' | 'github') => {
-  const { data, error } = await supabase.auth.signInWithOAuth({ provider });
+// OAuth login (Google, Apple, Microsoft/Azure)
+export const signInWithOAuth = async (provider: 'google' | 'apple' | 'azure') => {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: {
+      redirectTo: `${window.location.origin}/auth/callback`,
+      scopes: "email openid profile"
+    },
+  });
   return { data, error };
 };
 

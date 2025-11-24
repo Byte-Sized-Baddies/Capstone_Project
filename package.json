@@ -9,12 +9,15 @@
     "clean": "turbo run clean && rm -rf node_modules"
   },
   "devDependencies": {
-    "@types/react": "^18.3.11",
+    "@types/react": "~19.1.10",
     "tsup": "^8.5.0",
     "turbo": "2.5.8",
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.76.1"
+    "@supabase/supabase-js": "^2.76.1",
+    "expo": "^54.0.25",
+    "react": "18.2.0",
+    "react-native": "0.74.3"
   }
 }

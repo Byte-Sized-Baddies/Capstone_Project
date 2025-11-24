@@ -1,6 +1,8 @@
 // app/dashboard/page.tsx
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "../auth/supabaseClient";
 
 type Status = "not_started" | "in_progress";
 interface Task {
@@ -19,6 +21,7 @@ const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Ot
 const LIGHT_PINK = "#ffd6e8";
 
 export default function DashboardPage() {
+  const router = useRouter();
   // tasks & persistence
   const [tasks, setTasks] = useState<Task[]>([]);
   const [customCategories, setCustomCategories] = useState<string[]>([]);
@@ -56,7 +59,45 @@ export default function DashboardPage() {
   const [dateFilter, setDateFilter] = useState<string>(""); // "" or YYYY-MM-DD or "today"
   const [sortBy, setSortBy] = useState("added");
 
+  const [loading, setLoading] = useState(true);
   const searchRef = useRef<HTMLInputElement | null>(null);
+
+  // Logout
+const handleLogout = async () => {
+    console.log("LOGOUT button clicked");
+    await supabase.auth.signOut();
+    localStorage.removeItem("tasks");
+    localStorage.removeItem("categories");
+    localStorage.removeItem("invites");
+    localStorage.removeItem("avatar");
+    localStorage.removeItem("displayName");
+    router.push("/login");
+  };
+
+  // Session Check
+useEffect(() => {
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) {
+        router.push("/login");
+        return;
+      }
+      setLoading(false);
+      const user = data.session.user;
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
+      setDisplayName(name);
+    };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      checkSession();
+    });
+
+    checkSession();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
 
   // debounce search UI (friendly)
   useEffect(() => {
@@ -424,7 +465,17 @@ export default function DashboardPage() {
             {invites.map(i => <li key={i} className="flex items-center justify-between"><span>{i}</span></li>)}
           </ul>
         </div>
+      {/* LOGOUT BUTTON */}
+<div className="absolute bottom-6 left-0 w-full px-6">
+  <button 
+    onClick={handleLogout} 
+    className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
+  >
+    Logout
+  </button>
+</div>
       </aside>
+
 
       {/* TOPBAR */}
       <div className="max-w-7xl mx-auto">

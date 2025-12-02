@@ -1,22 +1,25 @@
-// apps/mobile/app/(tabs)/_layout.tsx
-
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-// You might also need this import if using theming:
-// import Colors from '@/constants/Colors';
+// import Colors from '@/constants/Colors'; 
 // import { useColorScheme } from '@/components/useColorScheme';
+import React from 'react';
+
+// Helper component for TabBar icons
+function TabBarIcon(props: {
+  name: React.ComponentProps<typeof Ionicons>['name'];
+  color: string;
+  size: number;
+}) {
+  return <Ionicons size={props.size} style={{ marginBottom: -3 }} {...props} />;
+}
 
 
-// 🛑 1. Define the explicit order here
 export const unstable_settings = {
-  // Sets the initial tab when the app loads
   initialRouteName: 'index', 
-  // Forces the tab bar to render in this exact sequence:
   order: [
-    'index',      // 1st: Home (using index for the main landing page)
-    'projects',    // 2nd: Folders
-    'agenda',     // 3rd: Agenda
-    'calendar',   // 4th: Calendar
+    'index',      // 1st: Home
+    'projects',   // 2nd: Projects (Using the file name you now have)
+    'calendar',   // 3rd: Calendar
   ],
 };
 
@@ -27,54 +30,38 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        // Set your active color here if you aren't using a theme hook
         // tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
         headerShown: false,
       }}
     >
-      {/* 1. Home Page */}
+      {/* 1. Home Page (index.tsx) */}
       <Tabs.Screen
-        name="index" // Use index.tsx for the main page
+        name="index" 
         options={{
           title: 'Home', 
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
-          ),
+          tabBarIcon: ({ color, size }) => <TabBarIcon name="home-outline" size={size} color={color} />,
         }}
       />
       
-      {/* 2. Folders Page */}
+      {/* 2. Projects Page (projects.tsx) */}
       <Tabs.Screen
-        name="projects" // Matches the folders.tsx filename
+        name="projects" // Matches the projects.tsx filename
         options={{
-          title: 'projects',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="folder-open-outline" size={size} color={color} />
-          ),
+          title: 'Projects', // Updated Tab Name
+          tabBarIcon: ({ color, size }) => <TabBarIcon name="folder-open-outline" size={size} color={color} />,
         }}
       />
 
-      {/* 3. Agenda Page */}
+      
+      {/* 3. Calendar View Page (calendar.tsx) */}
       <Tabs.Screen
-        name="agenda" // Matches the agenda.tsx filename
+        name="calendar" 
         options={{
-          title: 'Agenda',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="list-circle-outline" size={size} color={color} />
-          ),
+          title: 'Calendar',
+          tabBarIcon: ({ color, size }) => <TabBarIcon name="calendar-outline" size={size} color={color} />,
         }}
       />
       
-      {/* 4. Calendar View Page */}
-      <Tabs.Screen
-        name="calendar" // Matches the calendar.tsx filename
-        options={{
-          title: 'Calendar',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="calendar-outline" size={size} color={color} />
-          ),
-        }}
-      />
     </Tabs>
   );
 }

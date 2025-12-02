@@ -1,35 +1,52 @@
-// apps/mobile/components/FAB.tsx
-import { Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons'; // npm install @expo/vector-icons
+import React from 'react';
+import { TouchableOpacity, StyleSheet } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
-export function FAB() {
-  const handlePress = () => {
-    console.log('Add new task');
-    // Here you would navigate to a "new task" screen
-  };
-
-  return (
-    <Pressable style={styles.fab} onPress={handlePress}>
-      <Ionicons name="add" size={32} color="white" />
-    </Pressable>
-  );
+interface FABProps {
+  onPress: () => void;
 }
+
+// Define the yellow accent color (must match the modal)
+const ACCENT_YELLOW = '#FFD700';
+
+const FAB: React.FC<FABProps> = ({ onPress }) => {
+  return (
+    <TouchableOpacity
+      style={styles.fab}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <Ionicons name="add" size={30} color="#333" />
+    </TouchableOpacity>
+  );
+};
 
 const styles = StyleSheet.create({
   fab: {
+    // Positioning the button in the bottom right corner
     position: 'absolute',
     bottom: 30,
     right: 30,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: '#111827', // Dark gray / black
+
+    // Sizing and shape
+    width: 60,
+    height: 60,
+    borderRadius: 30, // Makes it a perfect circle
+
+    // Yellow styling
+    backgroundColor: ACCENT_YELLOW,
+
+    // Centering the icon
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
+
+    // Modern elevation (Shadow for iOS and Android)
+    shadowColor: ACCENT_YELLOW,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
+    elevation: 8, // Android shadow
   },
 });
+
+export default FAB;

@@ -1,51 +1,152 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useCallback,
+} from "react";
 
-export type Task = { id: string; title: string; createdAt: number; completed: boolean };
+export type TaskPriority = "low" | "medium" | "high";
 
-type TaskCtx = {
-  tasks: Task[];
-  addTask: (title: string) => void;
-  toggleTask: (id: string) => void;
-  clearAll: () => void;
+export type TaskAttachmentType = "image" | "file";
+
+export type TaskAttachment = {
+  id: string;
+  uri: string;
+  type: TaskAttachmentType;
+  name?: string;
 };
 
-const Ctx = createContext<TaskCtx | null>(null);
-const STORAGE_KEY = "dobee:tasks";
+export type Task = {
+  id: string;
+  title: string;
+  description?: string;
+  done: boolean;
+  createdAt: string;
 
-export function TaskProvider({ children }: { children: React.ReactNode }) {
+  // Deadlines / scheduling
+  dueDate?: string | null; // e.g. "2025-11-18" or ISO date
+  dueTime?: string | null; // e.g. "14:00" or "2:00 PM"
+
+  // Meta
+  priority: TaskPriority;
+  category?: string | null;
+  projectId?: string | null;
+
+  attachments: TaskAttachment[];
+};
+
+export type NewTaskInput = {
+  title: string;
+  description?: string;
+  dueDate?: string | null;
+  dueTime?: string | null;
+  priority?: TaskPriority;
+  category?: string | null;
+  projectId?: string | null;
+  attachments?: TaskAttachment[];
+};
+
+export type UpdateTaskInput = Partial<Omit<Task, "id" | "createdAt">>;
+
+type TasksContextType = {
+  tasks: Task[];
+
+  addTask: (input: NewTaskInput) => void;
+  toggleTask: (id: string) => void;
+  deleteTask: (id: string) => void;
+
+  // NEW
+  updateTask: (id: string, updates: UpdateTaskInput) => void;
+  clearCompleted: () => void;
+
+  // Optional but useful when you wire in Supabase / AsyncStorage
+  setAllTasks: (tasks: Task[]) => void;
+};
+
+const TasksContext = createContext<TasksContextType | undefined>(undefined);
+
+export function TasksProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  // load once
-  useEffect(() => {
-    (async () => {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
-      if (raw) setTasks(JSON.parse(raw));
-    })();
+  const addTask = useCallback(
+    ({
+      title,
+      description,
+      dueDate,
+      dueTime,
+      priority = "low",
+      category,
+      projectId,
+      attachments = [],
+    }: NewTaskInput) => {
+      if (!title.trim()) return;
+
+      const newTask: Task = {
+        id:
+          typeof crypto !== "undefined" && "randomUUID" in crypto
+            ? crypto.randomUUID()
+            : Math.random().toString(36).slice(2),
+        title: title.trim(),
+        description: description?.trim(),
+        done: false,
+        createdAt: new Date().toISOString(),
+        dueDate: dueDate || null,
+        dueTime: dueTime || null,
+        priority,
+        category: category || null,
+        projectId: projectId || null,
+        attachments,
+      };
+
+      setTasks((prev) => [newTask, ...prev]);
+    },
+    []
+  );
+
+  const toggleTask = useCallback((id: string) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
+    );
   }, []);
 
-  // persist on change
-  useEffect(() => {
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)).catch(() => {});
-  }, [tasks]);
+  const deleteTask = useCallback((id: string) => {
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
-  const addTask = (title: string) => {
-    const t: Task = { id: `${Date.now()}-${Math.random()}`, title: title.trim(), createdAt: Date.now(), completed: false };
-    if (!t.title) return;
-    setTasks(prev => [t, ...prev]); // newest first
-  };
+  const updateTask = useCallback((id: string, updates: UpdateTaskInput) => {
+    setTasks((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+    );
+  }, []);
 
-  const toggleTask = (id: string) =>
-    setTasks(prev => prev.map(t => (t.id === id ? { ...t, completed: !t.completed } : t)));
+  const clearCompleted = useCallback(() => {
+    setTasks((prev) => prev.filter((t) => !t.done));
+  }, []);
 
-  const clearAll = () => setTasks([]);
+  const setAllTasks = useCallback((next: Task[]) => {
+    setTasks(next);
+  }, []);
 
-  const value = useMemo(() => ({ tasks, addTask, toggleTask, clearAll }), [tasks]);
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
+  return (
+    <TasksContext.Provider
+      value={{
+        tasks,
+        addTask,
+        toggleTask,
+        deleteTask,
+        updateTask,
+        clearCompleted,
+        setAllTasks,
+      }}
+    >
+      {children}
+    </TasksContext.Provider>
+  );
 }
 
-export const useTasks = () => {
-  const v = useContext(Ctx);
-  if (!v) throw new Error("useTasks must be used inside <TaskProvider>");
-  return v;
-};
+export function useTasks() {
+  const ctx = useContext(TasksContext);
+  if (!ctx) throw new Error("useTasks must be used inside TasksProvider");
+  return ctx;
+}

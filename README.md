@@ -13,3 +13,6 @@ Team Members:
 Our project is focused on making a new To-Do list application. We want to indentify limitations of other To-Do list applications and see where we can make an application that has everything.
 
 Here is the link to our Trello board which we are using to manage the project : https://trello.com/b/Hl6oX54Q/capstone
+
+## How to Run in Local System
+- 

@@ -6,7 +6,7 @@ import dotenv from "dotenv";
  * This ensures Supabase and other shared env vars are available
  * when running from inside apps/web
  */
-dotenv.config({ path: path.resolve(process.cwd(), "../../.env.local") });
+dotenv.config({ path: path.resolve(process.cwd(), "../../.env") });
 
 /** @type {import('next').NextConfig} */
 interface NextConfig {

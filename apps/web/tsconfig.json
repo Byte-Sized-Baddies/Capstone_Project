@@ -22,6 +22,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/app/compenents/Sidebar/LogoutButton.jsx", "src/app/compenents/Sidebar/Sidebar.jsx"],
   "exclude": ["node_modules"]
 }

@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
+import { handleLogout } from "../auth/auth.ts"; // adjust path
 
 const LIGHT_PINK = "#ffd6e8";
 const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Other"];
@@ -126,6 +127,16 @@ export default function SettingsPage() {
           </button>
         </div>
 
+      {/* LOGOUT BUTTON */}
+          <div className="absolute bottom-6 left-0 w-full px-6">
+            <button 
+              onClick={handleLogout} 
+              className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
+            >
+              Logout
+            </button>
+          </div>
+
         {/* Avatar */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
@@ -220,6 +231,7 @@ export default function SettingsPage() {
           </ul>
         </div>
       </aside>
+      
 
       {/* TOP BAR */}
       <div className="max-w-7xl mx-auto">

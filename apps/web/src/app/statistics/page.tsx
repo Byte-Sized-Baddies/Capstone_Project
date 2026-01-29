@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
+import { handleLogout } from "../auth/auth.ts"; // adjust path
 
 const LIGHT_PINK = "#ffd6e8";
 
@@ -58,6 +59,7 @@ export default function StatisticsPage() {
   const weeklyData = [3, 6, 4, 8, 2, 7, 5]; // Replace with real daily stats later
   const maxVal = Math.max(...weeklyData, 10);
 
+
   return (
     <main
       className={`min-h-screen bg-[#fafafa] p-6 text-[#1a1a1a] transition-all ${
@@ -79,6 +81,15 @@ export default function StatisticsPage() {
             className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition"
           >
             ✕
+          </button>
+        </div>
+        {/* LOGOUT BUTTON */}
+        <div className="absolute bottom-6 left-0 w-full px-6">
+          <button 
+            onClick={handleLogout} 
+            className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
+          >
+            Logout
           </button>
         </div>
 

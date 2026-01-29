@@ -24,8 +24,28 @@ export const signInWithOAuth = async (provider: 'google' | 'apple' | 'azure') =>
   return { data, error };
 };
 
-// Sign out
+// Sign out from Supabase
 export const signOut = async () => {
   const { error } = await supabase.auth.signOut();
   return { error };
+};
+
+// Full logout: Supabase + localStorage + redirect
+export const handleLogout = async () => {
+  // 1. Call Supabase logout
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error("Error signing out:", error.message);
+  }
+
+  // 2. Clear localStorage
+  localStorage.removeItem("avatar");
+  localStorage.removeItem("displayName");
+  localStorage.removeItem("invites");
+  localStorage.removeItem("tasks");
+
+  // 3. Redirect to login page
+  if (typeof window !== "undefined") {
+    window.location.href = "/login"; // adjust if your login page is elsewhere
+  }
 };

@@ -1,14 +1,17 @@
+// app/statistics/page.tsx
 "use client";
 import React, { useEffect, useState, useRef } from "react";
-import { handleLogout } from "../auth/auth.ts"; // adjust path
+import { useRouter } from "next/navigation";
+import { supabase } from "../auth/supabaseClient";
 
 const LIGHT_PINK = "#ffd6e8";
 
 export default function StatisticsPage() {
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState("Kyathi Uyyala");
+  const [displayName, setDisplayName] = useState("User");
 
   const [invites, setInvites] = useState<string[]>([]);
 
@@ -16,6 +19,33 @@ export default function StatisticsPage() {
 
   const searchRef = useRef<HTMLInputElement>(null);
   const [rawSearch, setRawSearch] = useState("");
+
+  const [loading, setLoading] = useState(true);
+
+  // Session Check
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data.session) {
+        router.push("/login");
+        return;
+      }
+      setLoading(false);
+      const user = data.session.user;
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
+      setDisplayName(name);
+    };
+
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+      checkSession();
+    });
+
+    checkSession();
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, [router]);
 
   // ---------------------------------
   // LOAD FROM LOCAL STORAGE
@@ -32,6 +62,17 @@ export default function StatisticsPage() {
     if (t) try { setTasks(JSON.parse(t)); } catch {}
   }, []);
 
+  // Logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("tasks");
+    localStorage.removeItem("folders");
+    localStorage.removeItem("categories");
+    localStorage.removeItem("avatar");
+    localStorage.removeItem("displayName");
+    router.push("/login");
+  };
+
   const getInitials = (name = displayName) =>
     name.split(" ").map(x => x[0]).slice(0, 2).join("").toUpperCase();
 
@@ -44,7 +85,7 @@ export default function StatisticsPage() {
   // STATISTICS COMPUTATION
   // ---------------------------------
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.completed).length;
+  const completedTasks = tasks.filter(t => t.done).length;
   const completionRate = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
   // Top categories
@@ -59,6 +100,9 @@ export default function StatisticsPage() {
   const weeklyData = [3, 6, 4, 8, 2, 7, 5]; // Replace with real daily stats later
   const maxVal = Math.max(...weeklyData, 10);
 
+  if (loading) {
+    return <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">Loading...</div>;
+  }
 
   return (
     <main
@@ -70,7 +114,7 @@ export default function StatisticsPage() {
 
       {/* SIDEBAR (IDENTICAL TO DASHBOARD + SETTINGS) */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 ${
+        className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -83,21 +127,12 @@ export default function StatisticsPage() {
             ✕
           </button>
         </div>
-        {/* LOGOUT BUTTON */}
-        <div className="absolute bottom-6 left-0 w-full px-6">
-          <button 
-            onClick={handleLogout} 
-            className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
-          >
-            Logout
-          </button>
-        </div>
 
         {/* AVATAR */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
             {avatarDataUrl ? (
-              <img src={avatarDataUrl} className="w-14 h-14 rounded-full object-cover shadow" />
+              <img src={avatarDataUrl} alt="avatar" className="w-14 h-14 rounded-full object-cover shadow" />
             ) : (
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold shadow">
                 {getInitials()}
@@ -111,7 +146,7 @@ export default function StatisticsPage() {
         </div>
 
         {/* NAVIGATION */}
-        <nav className="space-y-3 animate-slide-in">
+        <nav className="space-y-3 animate-slide-in mb-6">
           {/* DASHBOARD */}
           <a
             href="/dashboard"
@@ -121,6 +156,17 @@ export default function StatisticsPage() {
               <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a"/>
             </svg>
             <span className="font-medium">Dashboard</span>
+          </a>
+
+          {/* CALENDAR */}
+          <a
+            href="/calendar"
+            className="flex items-center gap-3 bg-white shadow px-4 py-3 rounded-xl hover:bg-[#fff8d6] transition"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" fill="#1a1a1a" />
+            </svg>
+            <span className="font-medium">Calendar</span>
           </a>
 
           {/* STATISTICS (ACTIVE) */}
@@ -137,7 +183,7 @@ export default function StatisticsPage() {
           {/* SETTINGS */}
           <a
             href="/settings"
-            className="flex items-center gap-3 bg-white shadow px-4 py-3 rounded-xl hover:bg-[#ffd6e8] transition"
+            className="flex items-center gap-3 bg-white shadow px-4 py-3 rounded-xl hover:bg-[#fff8d6] transition"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
@@ -150,7 +196,7 @@ export default function StatisticsPage() {
         </nav>
 
         {/* INVITES */}
-        <div className="mt-6">
+        <div className="mb-6">
           <h4 className="text-sm font-medium mb-2">Invited</h4>
           <ul className="text-xs text-[#1a1a1a] max-h-24 overflow-auto space-y-1">
             {invites.map((i) => (
@@ -158,6 +204,16 @@ export default function StatisticsPage() {
             ))}
             {invites.length === 0 && <li className="opacity-50">No invites yet</li>}
           </ul>
+        </div>
+
+        {/* LOGOUT BUTTON */}
+        <div className="mt-auto pt-6 border-t border-yellow-200">
+          <button 
+            onClick={handleLogout} 
+            className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
+          >
+            Logout
+          </button>
         </div>
       </aside>
 
@@ -215,7 +271,7 @@ export default function StatisticsPage() {
 
             <div className="w-10 h-10 rounded-full shadow bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center">
               {avatarDataUrl ? (
-                <img src={avatarDataUrl} className="w-8 h-8 rounded-full object-cover" />
+                <img src={avatarDataUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
               ) : (
                 <span className="font-semibold">{getInitials()}</span>
               )}
@@ -250,9 +306,9 @@ export default function StatisticsPage() {
 
             <div className="flex items-end gap-4 h-40">
               {weeklyData.map((val, i) => (
-                <div key={i} className="flex flex-col items-center">
+                <div key={i} className="flex flex-col items-center flex-1">
                   <div
-                    className="w-8 rounded-t-xl bg-[#ffd6e8]"
+                    className="w-full rounded-t-xl bg-[#ffd6e8]"
                     style={{
                       height: `${(val / maxVal) * 100}%`,
                     }}
@@ -290,7 +346,7 @@ export default function StatisticsPage() {
           <section className="bg-white p-6 rounded-2xl border shadow">
             <h2 className="text-xl font-semibold mb-3">Activity Summary</h2>
             <p className="text-sm opacity-80">
-              You’ve completed <b>{completedTasks}</b> out of <b>{totalTasks}</b> tasks so far.  
+              You&apos;ve completed <b>{completedTasks}</b> out of <b>{totalTasks}</b> tasks so far.  
             </p>
             <p className="text-sm opacity-80 mt-2">
               Keep it up — consistency helps build strong habits!

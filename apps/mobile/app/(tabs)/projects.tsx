@@ -43,7 +43,7 @@ export default function ProjectsScreen() {
         createProject,
         updateProject,
     } = useProjects();
-    const { tasks } = useTasks();
+    const { tasks, toggleTask } = useTasks();
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState("");
@@ -218,7 +218,10 @@ export default function ProjectsScreen() {
                         >
                             <View style={styles.tasksCard}>
                                 <Text style={styles.tasksCardTitle}>Tasks</Text>
-                                <TaskList tasks={activeTasks} />
+                                <TaskList
+                                    tasks={activeTasks}
+                                    onToggleTask={toggleTask}
+                                />
                             </View>
                         </ScrollView>
 

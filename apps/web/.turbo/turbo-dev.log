@@ -4,122 +4,21 @@
 
    [1m[38;2;173;127;168m▲ Next.js 15.5.6[39m[22m
    - Local:        http://localhost:3000
-   - Network:      http://192.168.1.144:3000
+   - Network:      http://192.168.1.236:3000
+   - Environments: .env.local
 
  [32m[1m✓[22m[39m Starting...
- [32m[1m✓[22m[39m Ready in 1396ms
+ [32m[1m✓[22m[39m Ready in 1187ms
  [37m[1m○[22m[39m Compiling / ...
- [32m[1m✓[22m[39m Compiled / in 588ms (609 modules)
- GET / [32m200[39m in 857ms
- [37m[1m○[22m[39m Compiling /signup ...
- [32m[1m✓[22m[39m Compiled /signup in 511ms (987 modules)
-Supabase URL: [90mundefined[39m
-Supabase Key loaded? ❌
- [31m[1m⨯[22m[39m Error: supabaseUrl is required.
-    at eval (lib/auth/supabaseClient.ts:12:37)
-    at (pages-dir-node)/./lib/auth/supabaseClient.ts (.next/server/pages/signup.js:42:1)
-    at eval (webpack-internal:///(pages-dir-node)/./lib/auth/auth.ts:8:73)
-    at (pages-dir-node)/./lib/auth/auth.ts (.next/server/pages/signup.js:32:1)
-    at eval (webpack-internal:///(pages-dir-node)/./pages/signup.tsx:11:72)
-    at (pages-dir-node)/./pages/signup.tsx (.next/server/pages/signup.js:52:1)
-    at (pages-dir-node)/../../node_modules/[4m.pnpm[24m/next@15.5.6_babel-plugin-react-compiler@1.0.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/[4mnext[24m/dist/build/webpack/loaders/next-route-loader/index.js?kind=PAGES&page=%2Fsignup&preferredRegion=&absolutePagePath=.%2Fpages%2Fsignup.tsx&absoluteAppPath=private-next-pages%2F_app&absoluteDocumentPath=private-next-pages%2F_document&middlewareConfigBase64=e30%3D! (.next/server/pages/signup.js:22:1)
-[0m [90m 10 |[39m [36mconst[39m supabaseAnonKey [33m=[39m process[33m.[39menv[33m.[39m[33mNEXT_PUBLIC_SUPABASE_ANON_KEY[39m[33m![39m[33m;[39m
- [90m 11 |[39m
-[31m[1m>[22m[39m[90m 12 |[39m [36mexport[39m [36mconst[39m supabase [33m=[39m createClient(supabaseUrl[33m,[39m supabaseAnonKey)[33m;[39m
- [90m    |[39m                                     [31m[1m^[22m[39m
- [90m 13 |[39m[0m {
-  page: [32m'/signup'[39m
-}
- [32m[1m✓[22m[39m Compiled /_error in 143ms (1080 modules)
- GET /signup [31m500[39m in 1426ms
-Supabase URL: [90mundefined[39m
-Supabase Key loaded? ❌
- [31m[1m⨯[22m[39m Error: supabaseUrl is required.
-    at eval (lib/auth/supabaseClient.ts:12:37)
-    at (pages-dir-node)/./lib/auth/supabaseClient.ts (.next/server/pages/signup.js:42:1)
-    at eval (webpack-internal:///(pages-dir-node)/./lib/auth/auth.ts:8:73)
-    at (pages-dir-node)/./lib/auth/auth.ts (.next/server/pages/signup.js:32:1)
-    at eval (webpack-internal:///(pages-dir-node)/./pages/signup.tsx:11:72)
-    at (pages-dir-node)/./pages/signup.tsx (.next/server/pages/signup.js:52:1)
-    at (pages-dir-node)/../../node_modules/[4m.pnpm[24m/next@15.5.6_babel-plugin-react-compiler@1.0.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/[4mnext[24m/dist/build/webpack/loaders/next-route-loader/index.js?kind=PAGES&page=%2Fsignup&preferredRegion=&absolutePagePath=.%2Fpages%2Fsignup.tsx&absoluteAppPath=private-next-pages%2F_app&absoluteDocumentPath=private-next-pages%2F_document&middlewareConfigBase64=e30%3D! (.next/server/pages/signup.js:22:1)
-[0m [90m 10 |[39m [36mconst[39m supabaseAnonKey [33m=[39m process[33m.[39menv[33m.[39m[33mNEXT_PUBLIC_SUPABASE_ANON_KEY[39m[33m![39m[33m;[39m
- [90m 11 |[39m
-[31m[1m>[22m[39m[90m 12 |[39m [36mexport[39m [36mconst[39m supabase [33m=[39m createClient(supabaseUrl[33m,[39m supabaseAnonKey)[33m;[39m
- [90m    |[39m                                     [31m[1m^[22m[39m
- [90m 13 |[39m[0m {
-  page: [32m'/signup'[39m
-}
-Supabase URL: [90mundefined[39m
-Supabase Key loaded? ❌
- [31m[1m⨯[22m[39m Error: supabaseUrl is required.
-    at eval (lib/auth/supabaseClient.ts:12:37)
-    at (pages-dir-node)/./lib/auth/supabaseClient.ts (.next/server/pages/signup.js:42:1)
-    at eval (webpack-internal:///(pages-dir-node)/./lib/auth/auth.ts:8:73)
-    at (pages-dir-node)/./lib/auth/auth.ts (.next/server/pages/signup.js:32:1)
-    at eval (webpack-internal:///(pages-dir-node)/./pages/signup.tsx:11:72)
-    at (pages-dir-node)/./pages/signup.tsx (.next/server/pages/signup.js:52:1)
-    at (pages-dir-node)/../../node_modules/[4m.pnpm[24m/next@15.5.6_babel-plugin-react-compiler@1.0.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/[4mnext[24m/dist/build/webpack/loaders/next-route-loader/index.js?kind=PAGES&page=%2Fsignup&preferredRegion=&absolutePagePath=.%2Fpages%2Fsignup.tsx&absoluteAppPath=private-next-pages%2F_app&absoluteDocumentPath=private-next-pages%2F_document&middlewareConfigBase64=e30%3D! (.next/server/pages/signup.js:22:1)
-[0m [90m 10 |[39m [36mconst[39m supabaseAnonKey [33m=[39m process[33m.[39menv[33m.[39m[33mNEXT_PUBLIC_SUPABASE_ANON_KEY[39m[33m![39m[33m;[39m
- [90m 11 |[39m
-[31m[1m>[22m[39m[90m 12 |[39m [36mexport[39m [36mconst[39m supabase [33m=[39m createClient(supabaseUrl[33m,[39m supabaseAnonKey)[33m;[39m
- [90m    |[39m                                     [31m[1m^[22m[39m
- [90m 13 |[39m[0m {
-  page: [32m'/signup'[39m
-}
- GET /signup [31m500[39m in 443ms
- GET /signup [31m500[39m in 499ms
-Supabase URL: [90mundefined[39m
-Supabase Key loaded? ❌
- [31m[1m⨯[22m[39m Error: supabaseUrl is required.
-    at eval (lib/auth/supabaseClient.ts:12:37)
-    at (pages-dir-node)/./lib/auth/supabaseClient.ts (.next/server/pages/signup.js:42:1)
-    at eval (webpack-internal:///(pages-dir-node)/./lib/auth/auth.ts:8:73)
-    at (pages-dir-node)/./lib/auth/auth.ts (.next/server/pages/signup.js:32:1)
-    at eval (webpack-internal:///(pages-dir-node)/./pages/signup.tsx:11:72)
-    at (pages-dir-node)/./pages/signup.tsx (.next/server/pages/signup.js:52:1)
-    at (pages-dir-node)/../../node_modules/[4m.pnpm[24m/next@15.5.6_babel-plugin-react-compiler@1.0.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/[4mnext[24m/dist/build/webpack/loaders/next-route-loader/index.js?kind=PAGES&page=%2Fsignup&preferredRegion=&absolutePagePath=.%2Fpages%2Fsignup.tsx&absoluteAppPath=private-next-pages%2F_app&absoluteDocumentPath=private-next-pages%2F_document&middlewareConfigBase64=e30%3D! (.next/server/pages/signup.js:22:1)
-[0m [90m 10 |[39m [36mconst[39m supabaseAnonKey [33m=[39m process[33m.[39menv[33m.[39m[33mNEXT_PUBLIC_SUPABASE_ANON_KEY[39m[33m![39m[33m;[39m
- [90m 11 |[39m
-[31m[1m>[22m[39m[90m 12 |[39m [36mexport[39m [36mconst[39m supabase [33m=[39m createClient(supabaseUrl[33m,[39m supabaseAnonKey)[33m;[39m
- [90m    |[39m                                     [31m[1m^[22m[39m
- [90m 13 |[39m[0m {
-  page: [32m'/signup'[39m
-}
-Supabase URL: [90mundefined[39m
-Supabase Key loaded? ❌
- [31m[1m⨯[22m[39m Error: supabaseUrl is required.
-    at eval (lib/auth/supabaseClient.ts:12:37)
-    at (pages-dir-node)/./lib/auth/supabaseClient.ts (.next/server/pages/signup.js:42:1)
-    at eval (webpack-internal:///(pages-dir-node)/./lib/auth/auth.ts:8:73)
-    at (pages-dir-node)/./lib/auth/auth.ts (.next/server/pages/signup.js:32:1)
-    at eval (webpack-internal:///(pages-dir-node)/./pages/signup.tsx:11:72)
-    at (pages-dir-node)/./pages/signup.tsx (.next/server/pages/signup.js:52:1)
-    at (pages-dir-node)/../../node_modules/[4m.pnpm[24m/next@15.5.6_babel-plugin-react-compiler@1.0.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/[4mnext[24m/dist/build/webpack/loaders/next-route-loader/index.js?kind=PAGES&page=%2Fsignup&preferredRegion=&absolutePagePath=.%2Fpages%2Fsignup.tsx&absoluteAppPath=private-next-pages%2F_app&absoluteDocumentPath=private-next-pages%2F_document&middlewareConfigBase64=e30%3D! (.next/server/pages/signup.js:22:1)
-[0m [90m 10 |[39m [36mconst[39m supabaseAnonKey [33m=[39m process[33m.[39menv[33m.[39m[33mNEXT_PUBLIC_SUPABASE_ANON_KEY[39m[33m![39m[33m;[39m
- [90m 11 |[39m
-[31m[1m>[22m[39m[90m 12 |[39m [36mexport[39m [36mconst[39m supabase [33m=[39m createClient(supabaseUrl[33m,[39m supabaseAnonKey)[33m;[39m
- [90m    |[39m                                     [31m[1m^[22m[39m
- [90m 13 |[39m[0m {
-  page: [32m'/signup'[39m
-}
- GET /signup [31m500[39m in 484ms
- GET /signup [31m500[39m in 446ms
- GET /signup [32m200[39m in 6ms
-Supabase URL: [90mundefined[39m
-Supabase Key loaded? ❌
- [31m[1m⨯[22m[39m Error: supabaseUrl is required.
-    at eval (lib/auth/supabaseClient.ts:12:37)
-    at (pages-dir-node)/./lib/auth/supabaseClient.ts (.next/server/pages/signup.js:42:1)
-    at eval (webpack-internal:///(pages-dir-node)/./lib/auth/auth.ts:8:73)
-    at (pages-dir-node)/./lib/auth/auth.ts (.next/server/pages/signup.js:32:1)
-    at eval (webpack-internal:///(pages-dir-node)/./pages/signup.tsx:11:72)
-    at (pages-dir-node)/./pages/signup.tsx (.next/server/pages/signup.js:52:1)
-    at (pages-dir-node)/../../node_modules/[4m.pnpm[24m/next@15.5.6_babel-plugin-react-compiler@1.0.0_react-dom@19.1.0_react@19.1.0__react@19.1.0/node_modules/[4mnext[24m/dist/build/webpack/loaders/next-route-loader/index.js?kind=PAGES&page=%2Fsignup&preferredRegion=&absolutePagePath=.%2Fpages%2Fsignup.tsx&absoluteAppPath=private-next-pages%2F_app&absoluteDocumentPath=private-next-pages%2F_document&middlewareConfigBase64=e30%3D! (.next/server/pages/signup.js:22:1)
-[0m [90m 10 |[39m [36mconst[39m supabaseAnonKey [33m=[39m process[33m.[39menv[33m.[39m[33mNEXT_PUBLIC_SUPABASE_ANON_KEY[39m[33m![39m[33m;[39m
- [90m 11 |[39m
-[31m[1m>[22m[39m[90m 12 |[39m [36mexport[39m [36mconst[39m supabase [33m=[39m createClient(supabaseUrl[33m,[39m supabaseAnonKey)[33m;[39m
- [90m    |[39m                                     [31m[1m^[22m[39m
- [90m 13 |[39m[0m {
-  page: [32m'/signup'[39m
-}
+ [32m[1m✓[22m[39m Compiled / in 1481ms (563 modules)
+ GET / [32m200[39m in 1713ms
+ [37m[1m○[22m[39m Compiling /login ...
+ [32m[1m✓[22m[39m Compiled /login in 1265ms (807 modules)
+ GET /login [32m200[39m in 1401ms
+ GET /login [32m200[39m in 15ms
+Supabase URL: https://your-project-id.supabase.co
+Supabase Key loaded? ✅
+ GET /login [32m200[39m in 182ms
+ [32m[1m✓[22m[39m Compiled /signup in 452ms (806 modules)
+ GET /signup [32m200[39m in 544ms
 [?25h

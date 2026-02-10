@@ -1,19 +1,14 @@
 // app/dashboard/page.tsx
 "use client";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
-import { handleLogout } from "../auth/auth.ts"; // adjust path
-
-<button
-  onClick={handleLogout}
-  className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition"
->
-  Logout
-</button>
 
 
 type Status = "not_started" | "in_progress";
+type Priority = "Low" | "Medium" | "High";
+type PriorityFilter = "All" | Priority;
 interface Task {
   id: number;
   text: string;
@@ -22,34 +17,42 @@ interface Task {
   done: boolean;
   status: Status;
   created: number;
-  priority: "Low" | "Medium" | "High";
+  priority: Priority;
   category: string;
+  categoryId: number | null;
 }
 
-const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Other"];
+type Category = { id: number; name: string };
+
+const priorityToInt = (p: Priority) =>
+  p === "Low" ? 0 : p === "Medium" ? 1 : 2;
+
+const intToPriority = (v: number): Priority =>
+  v === 2 ? "High" : v === 1 ? "Medium" : "Low";
+
+const priorityOptions: Priority[] = ["Low", "Medium", "High"];
+
 const LIGHT_PINK = "#ffd6e8";
 
 export default function DashboardPage() {
   const router = useRouter();
   // tasks & persistence
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
-  const categoryList = [...presetCategories, ...customCategories];
+  const [categories, setCategories] = useState<Category[]>([]);
 
   // UI
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
-  const [categoryPanelOpen, setCategoryPanelOpen] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
 
   // form states
   const [newTask, setNewTask] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newDue, setNewDue] = useState("");
-  const [newPriority, setNewPriority] = useState<"Low" | "Medium" | "High">("Low");
-  const [newCategory, setNewCategory] = useState("School");
+  const [newPriority, setNewPriority] = useState<Priority>("Low");
+  const [newCategory, setNewCategory] = useState("");
+  const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<Status>("not_started");
 
   // invite
@@ -64,11 +67,10 @@ export default function DashboardPage() {
   const [rawSearch, setRawSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"All" | string>("All");
-  const [priorityFilter, setPriorityFilter] = useState<"All" | "Low" | "Medium" | "High">("All");
+  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("All");
   const [dateFilter, setDateFilter] = useState<string>(""); // "" or YYYY-MM-DD or "today"
   const [sortBy, setSortBy] = useState("added");
 
-  const [loading, setLoading] = useState(true);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   // Logout
@@ -91,7 +93,6 @@ useEffect(() => {
         router.push("/login");
         return;
       }
-      setLoading(false);
       const user = data.session.user;
       const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       setDisplayName(name);
@@ -116,17 +117,9 @@ useEffect(() => {
 
   // load saved state
   useEffect(() => {
-    const saved = localStorage.getItem("tasks");
-    const savedCat = localStorage.getItem("categories");
     const savedInv = localStorage.getItem("invites");
     const savedAvatar = localStorage.getItem("avatar");
     const savedName = localStorage.getItem("displayName");
-    if (saved) {
-      try { setTasks(JSON.parse(saved)); } catch { setTasks([]); }
-    }
-    if (savedCat) {
-      try { setCustomCategories(JSON.parse(savedCat)); } catch { setCustomCategories([]); }
-    }
     if (savedInv) {
       try { setInvites(JSON.parse(savedInv)); } catch { setInvites([]); }
     }
@@ -138,30 +131,68 @@ useEffect(() => {
     setRawSearch(params.get("q") ?? "");
     setCategoryFilter(params.get("cat") ?? "All");
     const pr = params.get("p") ?? "All";
-    setPriorityFilter(["Low", "Medium", "High"].includes(pr) ? (pr as any) : "All");
+    setPriorityFilter(priorityOptions.includes(pr as Priority) ? (pr as Priority) : "All");
     setDateFilter(params.get("d") ?? "");
     setSortBy(params.get("s") ?? "added");
 
-    // request notification permission on first open (if default)
-    if (typeof Notification !== "undefined") {
-      if (Notification.permission === "default") {
-        // prompt once
-        Notification.requestPermission().then(() => {
-          // after permission choose, if granted send due-today notifications
-          sendDueTodayNotifications();
-        }).catch(() => {});
-      } else if (Notification.permission === "granted") {
-        sendDueTodayNotifications();
-      }
-    }
   }, []);
 
   // persist
-  useEffect(() => localStorage.setItem("tasks", JSON.stringify(tasks)), [tasks]);
-  useEffect(() => localStorage.setItem("categories", JSON.stringify(customCategories)), [customCategories]);
   useEffect(() => localStorage.setItem("invites", JSON.stringify(invites)), [invites]);
   useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
+
+  // load categories + tasks from Supabase
+  useEffect(() => {
+    const loadCategoriesAndTasks = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData.user;
+      if (!user) return;
+
+      const { data: catRows, error: catError } = await supabase
+        .from("categories_v2")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
+
+      const categoryMap = new Map<number, string>();
+      if (!catError && catRows) {
+        setCategories(catRows);
+        catRows.forEach((c) => categoryMap.set(c.id, c.name));
+        if (catRows.length && newCategoryId === null) {
+          setNewCategoryId(catRows[0].id);
+          setNewCategory(catRows[0].name);
+        }
+      }
+
+      const { data: taskRows, error: taskError } = await supabase
+        .from("tasks_v2")
+        .select("id, title, description, due_date, priority, is_completed, created_at, category_id")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (!taskError && taskRows) {
+        const mapped: Task[] = taskRows.map((row) => {
+          const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
+          return {
+            id: row.id,
+            text: row.title,
+            description: row.description ?? "",
+            due: row.due_date ?? "No date",
+            done: !!row.is_completed,
+            status: row.is_completed ? "in_progress" : "not_started",
+            created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+            priority: intToPriority(row.priority ?? 0),
+            category: categoryName,
+            categoryId: row.category_id ?? null,
+          };
+        });
+        setTasks(mapped);
+      }
+    };
+
+    loadCategoriesAndTasks();
+  }, [newCategoryId]);
 
   // sync filters to URL
   useEffect(() => {
@@ -186,39 +217,74 @@ useEffect(() => {
     setNewDescription("");
     setNewDue("");
     setNewPriority("Low");
-    setNewCategory(categoryList[0] ?? "School");
+    const firstCategory = categories[0];
+    setNewCategory(firstCategory?.name ?? "");
+    setNewCategoryId(firstCategory?.id ?? null);
     setNewStatus("not_started");
     setEditId(null);
   };
 
   // add/edit
-  const handleAddOrEdit = (e?: React.FormEvent) => {
+  const handleAddOrEdit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!newTask.trim()) return;
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) return;
+
+    const existingTask = editId !== null ? tasks.find((t) => t.id === editId) : null;
+
+    const payload = {
+      user_id: user.id,
+      category_id: newCategoryId,
+      title: newTask.trim(),
+      description: newDescription.trim() || null,
+      due_date: newDue || null,
+      priority: priorityToInt(newPriority),
+      is_completed: existingTask?.done ?? false,
+    };
+
     if (editId !== null) {
+      await supabase
+        .from("tasks_v2")
+        .update(payload)
+        .eq("id", editId)
+        .eq("user_id", user.id);
+
       setTasks(prev => prev.map(t => t.id === editId ? {
         ...t,
-        text: newTask.trim(),
-        description: newDescription.trim(),
-        due: newDue || "No date",
+        text: payload.title,
+        description: payload.description ?? "",
+        due: payload.due_date ?? "No date",
         priority: newPriority,
         category: newCategory,
+        categoryId: newCategoryId,
         status: newStatus
       } : t));
       setEditId(null);
     } else {
-      const t: Task = {
-        id: Date.now(),
-        text: newTask.trim(),
-        description: newDescription.trim(),
-        due: newDue || "No date",
-        done: false,
-        status: newStatus,
-        created: Date.now(),
-        priority: newPriority,
-        category: newCategory
-      };
-      setTasks(prev => [t, ...prev]);
+      const { data, error } = await supabase
+        .from("tasks_v2")
+        .insert(payload)
+        .select("id, created_at")
+        .single();
+
+      if (!error && data) {
+        const t: Task = {
+          id: data.id,
+          text: payload.title,
+          description: payload.description ?? "",
+          due: payload.due_date ?? "No date",
+          done: false,
+          status: newStatus,
+          created: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+          priority: newPriority,
+          category: newCategory,
+          categoryId: newCategoryId,
+        };
+        setTasks(prev => [t, ...prev]);
+      }
     }
     resetForm();
     setShowModal(false);
@@ -231,15 +297,43 @@ useEffect(() => {
     setNewDue(task.due !== "No date" ? task.due : "");
     setNewPriority(task.priority);
     setNewCategory(task.category);
+    setNewCategoryId(task.categoryId ?? null);
     setNewStatus(task.status);
     setShowModal(true);
   };
 
-  const deleteTask = (id: number) => setTasks(prev => prev.filter(t => t.id !== id));
-  const toggleDone = (id: number) => {
+  const deleteTask = async (id: number) => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) return;
+
+    await supabase
+      .from("tasks_v2")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
+
+    setTasks(prev => prev.filter(t => t.id !== id));
+  };
+
+  const toggleDone = async (id: number) => {
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return;
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) return;
+
+    const nextDone = !task.done;
+    await supabase
+      .from("tasks_v2")
+      .update({ is_completed: nextDone })
+      .eq("id", id)
+      .eq("user_id", user.id);
+
     setTasks(prev => prev.map(t => {
       if (t.id === id) {
-        const updated = { ...t, done: !t.done };
+        const updated = { ...t, done: nextDone };
         // send notification on completion
         if (!t.done && updated.done) sendNotification(`Task Completed`, `${t.text}`);
         return updated;
@@ -250,11 +344,39 @@ useEffect(() => {
   const setTaskStatus = (id: number, status: Status) => setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
 
   // custom category add
-  const addCustomCategory = (val: string) => {
+  const addCustomCategory = async (val: string) => {
     const v = val.trim();
     if (!v) return;
-    setCustomCategories(prev => Array.from(new Set([v, ...prev])));
-    setNewCategory(v);
+
+    const existing = categories.find((c) => c.name.toLowerCase() === v.toLowerCase());
+    if (existing) {
+      setNewCategory(existing.name);
+      setNewCategoryId(existing.id);
+      return;
+    }
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (userError || !user) {
+      alert("You must be logged in to create a category.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("categories_v2")
+      .insert({ user_id: user.id, name: v })
+      .select("id, name")
+      .single();
+
+    if (error || !data) {
+      console.error("Category insert failed:", error);
+      alert(`Failed to create category: ${error?.message ?? "Unknown error"}`);
+      return;
+    }
+
+    setCategories((prev) => [...prev, data]);
+    setNewCategory(data.name);
+    setNewCategoryId(data.id);
   };
 
   // invite
@@ -356,17 +478,17 @@ useEffect(() => {
   };
 
   // notifications helpers
-  const sendNotification = (title: string, body?: string) => {
+  const sendNotification = useCallback((title: string, body?: string) => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
     try {
       new Notification(title, { body });
-    } catch (e) {
+    } catch {
       // ignore
     }
-  };
+  }, []);
 
-  const sendDueTodayNotifications = () => {
+  const sendDueTodayNotifications = useCallback(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
     const today = new Date().toISOString().split("T")[0];
@@ -374,18 +496,21 @@ useEffect(() => {
     dueToday.forEach((t, i) => {
       setTimeout(() => sendNotification("Due Today", `${t.text} is due today`), i * 400);
     });
-  };
+  }, [sendNotification, tasks]);
 
-  // manual test notification
-  const sendTestNotification = () => {
+  // request notification permission on first open (if default)
+  useEffect(() => {
+    if (typeof Notification === "undefined") return;
     if (Notification.permission === "default") {
-      Notification.requestPermission().then(p => { if (p === "granted") sendNotification("Test", "This is a test notification"); });
+      // prompt once
+      Notification.requestPermission().then(() => {
+        // after permission choose, if granted send due-today notifications
+        sendDueTodayNotifications();
+      }).catch(() => {});
     } else if (Notification.permission === "granted") {
-      sendNotification("Test", "This is a test notification");
-    } else {
-      alert("Notifications are blocked. Update browser settings to allow notifications.");
+      sendDueTodayNotifications();
     }
-  };
+  }, [sendDueTodayNotifications]);
 
   // avatar initial fallback
   const getInitials = (name = displayName) => {
@@ -435,7 +560,14 @@ useEffect(() => {
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
             {avatarDataUrl ? (
-              <img src={avatarDataUrl} alt="avatar" className="w-14 h-14 rounded-full object-cover shadow" />
+              <Image
+                src={avatarDataUrl}
+                alt="User avatar"
+                width={56}
+                height={56}
+                unoptimized
+                className="w-14 h-14 rounded-full object-cover shadow"
+              />
             ) : (
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">{getInitials()}</div>
             )}
@@ -514,7 +646,20 @@ useEffect(() => {
               <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
             </div>
 
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">{avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}</div>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
+              {avatarDataUrl ? (
+                <Image
+                  src={avatarDataUrl}
+                  alt="User avatar"
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="w-8 h-8 rounded-full object-cover"
+                />
+              ) : (
+                <span className="font-semibold">{getInitials()}</span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -538,10 +683,10 @@ useEffect(() => {
                 </select>
 
                 <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }} className={`px-3 py-2 rounded-xl border ${dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"}`}>
-                  Today's Tasks
+                  Today&apos;s Tasks
                 </button>
 
-                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)} className="border rounded-xl p-2 bg-white">
+                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as PriorityFilter)} className="border rounded-xl p-2 bg-white">
                   <option value="All">Priority: All</option>
                   <option value="High">High</option>
                   <option value="Medium">Medium</option>
@@ -581,7 +726,7 @@ useEffect(() => {
 
                             <div className="flex items-center gap-2 mt-3">
                               <span className={`px-2 py-1 rounded-full text-xs ${beePriorityColor[task.priority]}`}>{task.priority}</span>
-                              <span className={`px-2 py-1 rounded-full text-xs ${(beeCategoryColor as any)[task.category] || "bg-[#ffeeb3] text-[#4a3f00]"}`}>{task.category}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs ${beeCategoryColor[task.category] ?? "bg-[#ffeeb3] text-[#4a3f00]"}`}>{task.category}</span>
                             </div>
                           </div>
 
@@ -679,14 +824,25 @@ useEffect(() => {
                 <input type="date" className="w-full border p-2 rounded-xl" value={newDue} onChange={e => setNewDue(e.target.value)} />
 
                 <div className="grid grid-cols-2 gap-3">
-                  <select className="w-full border p-2 rounded-xl" value={newPriority} onChange={e => setNewPriority(e.target.value as any)}>
+                  <select className="w-full border p-2 rounded-xl" value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}>
                     <option value="Low">Low Priority</option>
                     <option value="Medium">Medium Priority</option>
                     <option value="High">High Priority</option>
                   </select>
 
-                  <select className="w-full border p-2 rounded-xl" value={newCategory} onChange={e => setNewCategory(e.target.value)}>
-                    {categoryList.map(c => <option key={c} value={c}>{c}</option>)}
+                  <select
+                    className="w-full border p-2 rounded-xl"
+                    value={newCategoryId ?? ""}
+                    onChange={(e) => {
+                      const id = Number(e.target.value);
+                      const cat = categories.find((c) => c.id === id);
+                      setNewCategoryId(id);
+                      setNewCategory(cat?.name ?? "");
+                    }}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
                   </select>
                 </div>
 

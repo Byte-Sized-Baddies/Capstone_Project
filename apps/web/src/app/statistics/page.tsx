@@ -1,8 +1,7 @@
 "use client";
-import React, { useEffect, useState, useRef } from "react";
-import { handleLogout } from "../auth/auth.ts"; // adjust path
-
-const LIGHT_PINK = "#ffd6e8";
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
+import { handleLogout } from "../auth/auth"; // adjust path
 
 export default function StatisticsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -12,9 +11,11 @@ export default function StatisticsPage() {
 
   const [invites, setInvites] = useState<string[]>([]);
 
-  const [tasks, setTasks] = useState<any[]>([]);
-
-  const searchRef = useRef<HTMLInputElement>(null);
+  type Task = {
+    category: string;
+    done: boolean;
+  };
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [rawSearch, setRawSearch] = useState("");
 
   // ---------------------------------
@@ -44,7 +45,7 @@ export default function StatisticsPage() {
   // STATISTICS COMPUTATION
   // ---------------------------------
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.completed).length;
+  const completedTasks = tasks.filter(t => t.done).length;
   const completionRate = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
 
   // Top categories
@@ -97,7 +98,14 @@ export default function StatisticsPage() {
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
             {avatarDataUrl ? (
-              <img src={avatarDataUrl} className="w-14 h-14 rounded-full object-cover shadow" />
+              <Image
+                src={avatarDataUrl}
+                alt="User avatar"
+                width={56}
+                height={56}
+                unoptimized
+                className="w-14 h-14 rounded-full object-cover shadow"
+              />
             ) : (
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold shadow">
                 {getInitials()}
@@ -215,7 +223,14 @@ export default function StatisticsPage() {
 
             <div className="w-10 h-10 rounded-full shadow bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center">
               {avatarDataUrl ? (
-                <img src={avatarDataUrl} className="w-8 h-8 rounded-full object-cover" />
+                <Image
+                  src={avatarDataUrl}
+                  alt="User avatar"
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="w-8 h-8 rounded-full object-cover"
+                />
               ) : (
                 <span className="font-semibold">{getInitials()}</span>
               )}

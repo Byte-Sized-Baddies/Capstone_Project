@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
-import { handleLogout } from "../auth/auth.ts"; // adjust path
+import Image from "next/image";
+import { handleLogout } from "../auth/auth"; // adjust path
 
 const LIGHT_PINK = "#ffd6e8";
 const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Other"];
@@ -141,7 +142,14 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
             {avatarDataUrl ? (
-              <img src={avatarDataUrl} alt="avatar" className="w-14 h-14 rounded-full object-cover shadow" />
+              <Image
+                src={avatarDataUrl}
+                alt="User avatar"
+                width={56}
+                height={56}
+                unoptimized
+                className="w-14 h-14 rounded-full object-cover shadow"
+              />
             ) : (
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">
                 {getInitials()}
@@ -298,7 +306,14 @@ export default function SettingsPage() {
 
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
               {avatarDataUrl ? (
-                <img src={avatarDataUrl} className="w-8 h-8 rounded-full object-cover" />
+                <Image
+                  src={avatarDataUrl}
+                  alt="User avatar"
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="w-8 h-8 rounded-full object-cover"
+                />
               ) : (
                 <span className="font-semibold">{getInitials()}</span>
               )}
@@ -316,7 +331,14 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <div className="relative">
                 {avatarDataUrl ? (
-                  <img src={avatarDataUrl} className="h-20 w-20 rounded-full object-cover shadow" />
+                  <Image
+                    src={avatarDataUrl}
+                    alt="User avatar"
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="h-20 w-20 rounded-full object-cover shadow"
+                  />
                 ) : (
                   <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center text-lg font-bold shadow">
                     {getInitials()}

@@ -6,8 +6,8 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
-import { Task } from "../app/context/tasks";
-import { useProjects } from "../app/context/projects";
+import { Task } from "../context/tasks";
+import { useProjects } from "../context/projects";
 
 // Minimal project shape we care about
 type ProjectLike = {

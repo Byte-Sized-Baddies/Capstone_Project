@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated, Easing } from "react-native";
 import Svg, { Path } from "react-native-svg";
-import { useTasks } from "../app/context/tasks";
+import { useTasks } from "../context/tasks";
 
 // Configuration
 const DAILY_GOAL = 5;
@@ -49,22 +49,22 @@ const AnimatedPath = Animated.createAnimatedComponent(Path);
 export default function HoneyCombTracker() {
     const { tasks } = useTasks();
 
-// Count tasks completed TODAY
+    // Count tasks completed TODAY
     const completedToday = tasks.filter((t) => {
         if (!t.done) return false;
 
         if (t.completedAt) {
             const today = new Date();
             const doneDate = new Date(t.completedAt);
-            
+
             return (
                 doneDate.getDate() === today.getDate() &&
                 doneDate.getMonth() === today.getMonth() &&
                 doneDate.getFullYear() === today.getFullYear()
             );
         }
-        
-        return false; 
+
+        return false;
     }).length;
 
     return (

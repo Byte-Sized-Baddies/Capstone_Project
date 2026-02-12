@@ -1,5 +1,7 @@
 // apps/mobile/components/EditTaskModal.tsx
 import React, { useEffect, useState } from "react";
+import { Platform } from "react-native";
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import {
     Modal,
     View,
@@ -14,8 +16,8 @@ import {
     Task,
     TaskAttachment,
     TaskPriority,
-} from "../app/context/tasks";
-import { useProjects } from "../app/context/projects";
+} from "../context/tasks";
+import { useProjects } from "../context/projects";
 
 type ProjectLike = {
     id: string;
@@ -38,6 +40,7 @@ type EditTaskModalProps = {
     }) => void;
 };
 
+
 export default function EditTaskModal({
     task,
     onClose,
@@ -56,6 +59,30 @@ export default function EditTaskModal({
     const [projectId, setProjectId] = useState<string | null>(
         task.projectId ?? null
     );
+
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showTimePicker, setShowTimePicker] = useState(false);
+
+    const onDateChange = (event: any, selectedDate?: Date) => {
+        // On Android, the picker closes immediately after selection
+        if (Platform.OS === 'android') setShowDatePicker(false);
+
+        if (selectedDate) {
+            // Format to YYYY-MM-DD for the database/web compatibility
+            setDueDate(selectedDate.toISOString().split('T')[0]);
+        }
+    };
+
+    const onTimeChange = (event: DateTimePickerEvent, selectedTime?: Date) => {
+        if (Platform.OS === 'android') setShowTimePicker(false);
+        if (selectedTime) {
+            const timeString = selectedTime.toLocaleTimeString([], {
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            setDueTime(timeString);
+        }
+    };
 
     // Sync when task changes
     useEffect(() => {
@@ -125,24 +152,25 @@ export default function EditTaskModal({
                             textAlignVertical="top"
                         />
 
-                        {/* Due date */}
-                        <Text style={styles.label}>Due date</Text>
-                        <TextInput
-                            value={dueDate ?? ""}
-                            onChangeText={setDueDate}
+                        {/* Due Date Section */}
+                        <Text style={styles.label}>Due Date</Text>
+                        <TouchableOpacity
                             style={styles.input}
-                            placeholder="YYYY-MM-DD"
-                        />
+                            onPress={() => setShowDatePicker(true)}
+                        >
+                            <Text style={{ color: dueDate ? "#111" : "#999" }}>
+                                {dueDate ? new Date(dueDate).toLocaleDateString() : "Select Date"}
+                            </Text>
+                        </TouchableOpacity>
 
-                        {/* Due time */}
-                        <Text style={styles.label}>Due time</Text>
-                        <TextInput
-                            value={dueTime ?? ""}
-                            onChangeText={setDueTime}
-                            style={styles.input}
-                            placeholder="HH:MM"
-                        />
-
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={dueDate ? new Date(dueDate) : new Date()}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                onChange={onDateChange}
+                            />
+                        )}
                         {/* Priority */}
                         <Text style={styles.label}>Priority</Text>
                         <View style={styles.priorityRow}>

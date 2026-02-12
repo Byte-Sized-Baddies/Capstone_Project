@@ -7,8 +7,8 @@ import {
     StyleSheet,
     ScrollView,
 } from "react-native";
-import { useTasks, Task } from "../context/tasks";
-import { useProjects } from "../context/projects";
+import { useTasks, Task } from "../../context/tasks";
+import { useProjects } from "../../context/projects";
 import TaskList from "../../components/TaskList";
 
 type ViewMode = "5day" | "week" | "month";
@@ -171,7 +171,7 @@ export default function CalendarScreen() {
                             No tasks yet. Tap the + button to add your first one.
                         </Text>
                     ) : (
-                        <TaskList tasks={tasksForSelected} 
+                        <TaskList tasks={tasksForSelected}
                             onToggleTask={toggleTask} />
                     )}
                 </View>

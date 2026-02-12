@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+
 import {
   Modal,
   View,
@@ -10,8 +12,8 @@ import {
   StyleSheet,
   ScrollView,
 } from "react-native";
-import { useTasks, TaskPriority, TaskAttachment } from "../app/context/tasks";
-import { useProjects } from "../app/context/projects";
+import { useTasks, TaskPriority, TaskAttachment } from "../context/tasks";
+import { useProjects } from "../context/projects";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 
@@ -72,6 +74,8 @@ export default function AddTaskModal() {
   const [priority, setPriority] = useState<TaskPriority>("low");
   const [category, setCategory] = useState("School");
   const [projectId, setProjectId] = useState<string | null>(activeProjectId);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
 
@@ -90,14 +94,11 @@ export default function AddTaskModal() {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
 
-    const normalizedDueDate = normalizeDateInput(dueDate);
-    const normalizedDueTime = normalizeTimeInput(dueTime);
-
     addTask({
       title: trimmedTitle,
       description: description.trim() || undefined,
-      dueDate: normalizedDueDate,
-      dueTime: normalizedDueTime,
+      dueDate: dueDate || null, // Already in YYYY-MM-DD format from picker
+      dueTime: dueTime || null,
       priority,
       category: category.trim() || null,
       projectId,
@@ -108,29 +109,28 @@ export default function AddTaskModal() {
     setVisible(false);
   };
 
-  // SMART DATE-TIME PARSING:
-  // If user types "11/30 5pm" into the Due date field,
-  // we automatically split to dueDate="11/30" and dueTime="5pm".
-  const handleDueDateChange = (text: string) => {
-    // Look for "date time" structure: "mm/dd ...time..."
-    const match = text.match(
-      /(\d{1,2}[\/-]\d{1,2}(?:[\/-]\d{2,4})?)\s+(.+)/
-    );
+  const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    // Android requires manual closing; iOS can stay open in a 'spinner'
+    if (Platform.OS === 'android') setShowDatePicker(false);
 
-    if (match) {
-      const [, datePart, timePart] = match;
-      setDueDate(datePart);
-      if (!dueTime) {
-        setDueTime(timePart.trim());
-      }
-    } else {
-      setDueDate(text);
+    if (selectedDate) {
+      // Formats to YYYY-MM-DD for database & teammate's web compatibility
+      setDueDate(selectedDate.toISOString().split('T')[0]);
     }
   };
 
-  const handleDueTimeChange = (text: string) => {
-    setDueTime(text);
+  const onTimeChange = (event: DateTimePickerEvent, selectedTime?: Date) => {
+    if (Platform.OS === 'android') setShowTimePicker(false);
+
+    if (selectedTime) {
+      const timeString = selectedTime.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+      setDueTime(timeString);
+    }
   };
+
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -216,27 +216,25 @@ export default function AddTaskModal() {
                 multiline
               />
 
-              {/* Deadlines */}
-              <View style={styles.row}>
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text style={styles.label}>Due date</Text>
-                  <TextInput
-                    placeholder="mm/dd or mm/dd/yyyy"
-                    value={dueDate}
-                    onChangeText={handleDueDateChange}
-                    style={styles.input}
-                  />
-                </View>
-                <View style={{ flex: 1, marginLeft: 8 }}>
-                  <Text style={styles.label}>Time (deadline)</Text>
-                  <TextInput
-                    placeholder="e.g. 5:00 PM"
-                    value={dueTime}
-                    onChangeText={handleDueTimeChange}
-                    style={styles.input}
-                  />
-                </View>
-              </View>
+              {/* Due Date Section */}
+              <Text style={styles.label}>Due Date</Text>
+              <TouchableOpacity
+                style={styles.input}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Text style={{ color: dueDate ? "#111" : "#999" }}>
+                  {dueDate ? new Date(dueDate).toLocaleDateString() : "Select Date"}
+                </Text>
+              </TouchableOpacity>
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={dueDate ? new Date(dueDate) : new Date()}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onDateChange}
+                />
+              )}
 
               {/* Priority */}
               <Text style={[styles.label, { marginTop: 14 }]}>Priority</Text>

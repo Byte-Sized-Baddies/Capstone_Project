@@ -16,6 +16,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "8.4.4",
     "@supabase/supabase-js": "^2.76.1",
     "expo": "^54.0.25",
     "expo-device": "~8.0.10",

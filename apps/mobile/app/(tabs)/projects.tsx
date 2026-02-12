@@ -8,34 +8,16 @@ import {
     TextInput,
     ScrollView,
 } from "react-native";
-import { useProjects } from "../context/projects";
-import { useTasks } from "../context/tasks";
+import { useProjects } from "../../context/projects";
+import { useTasks } from "../../context/tasks";
 import TaskList from "../../components/TaskList";
 import AddTaskModal from "../../components/AddTaskModal";
 
-const COLOR_CHOICES = [
-    "#FACC15",
-    "#4ADE80",
-    "#60A5FA",
-    "#FB7185",
-    "#A855F7",
-    "#F97316",
-];
-
-const ICON_CHOICES = [
-    "📂",
-    "📁",
-    "📚",
-    "📘",
-    "📝",
-    "💼",
-    "🧪",
-    "🏫",
-    "🏋️‍♀️",
-    "💡",
-];
+const COLOR_CHOICES = ["#FACC15", "#4ADE80", "#60A5FA", "#FB7185", "#A855F7", "#F97316"];
+const ICON_CHOICES = ["📂", "📁", "📚", "📘", "📝", "💼", "🧪", "🏫", "🏋️‍♀️", "💡"];
 
 export default function ProjectsScreen() {
+    // 1. Hook into Context
     const {
         projects,
         activeProjectId,
@@ -45,6 +27,7 @@ export default function ProjectsScreen() {
     } = useProjects();
     const { tasks, toggleTask } = useTasks();
 
+    // 2. Local State for Modals
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState("");
     const [selectedColor, setSelectedColor] = useState(COLOR_CHOICES[0]);
@@ -56,6 +39,7 @@ export default function ProjectsScreen() {
     const [editColor, setEditColor] = useState(COLOR_CHOICES[0]);
     const [editIcon, setEditIcon] = useState(ICON_CHOICES[0]);
 
+    // 3. Memos for active view
     const activeProject = useMemo(
         () => projects.find((p) => p.id === activeProjectId) ?? null,
         [projects, activeProjectId]
@@ -66,9 +50,11 @@ export default function ProjectsScreen() {
         return tasks.filter((t) => t.projectId === activeProject.id);
     }, [tasks, activeProject]);
 
+    // 4. Action Handlers
     const handleCreate = () => {
         if (!projectName.trim()) return;
-        createProject(projectName, selectedColor, selectedIcon);
+        // Call the context function directly
+        createProject(projectName.trim(), selectedColor, selectedIcon);
         setProjectName("");
         setSelectedColor(COLOR_CHOICES[0]);
         setSelectedIcon(ICON_CHOICES[0]);
@@ -95,47 +81,31 @@ export default function ProjectsScreen() {
     };
 
     const goBackToGrid = () => setActiveProject(null);
-
     const isGridView = !activeProject;
 
-    // ---------- RENDER ----------
     return (
         <View style={styles.container}>
-            {/* Header */}
             <View style={styles.headerRow}>
                 {isGridView ? (
                     <>
-                        {/* GRID VIEW HEADER */}
                         <View>
                             <Text style={styles.appName}>DO BEE</Text>
                             <Text style={styles.screenTitle}>Projects</Text>
                         </View>
-
-                        <TouchableOpacity
-                            style={styles.primaryButton}
-                            onPress={() => setShowCreateModal(true)}
-                        >
+                        <TouchableOpacity style={styles.primaryButton} onPress={() => setShowCreateModal(true)}>
                             <Text style={styles.primaryButtonText}>+ New Project</Text>
                         </TouchableOpacity>
                     </>
                 ) : (
                     <>
-                        {/* PROJECT DETAIL HEADER */}
                         <View style={styles.detailHeaderLeft}>
-
-                            {/* pill with emoji + name under DO BEE */}
                             <View style={{ marginTop: 6 }}>
                                 <View style={styles.projectHeaderChip}>
-                                    <Text style={styles.projectHeaderChipEmoji}>
-                                        {activeProject?.icon}
-                                    </Text>
-                                    <Text style={styles.projectHeaderChipText}>
-                                        {activeProject?.name}
-                                    </Text>
+                                    <Text style={styles.projectHeaderChipEmoji}>{activeProject?.icon}</Text>
+                                    <Text style={styles.projectHeaderChipText}>{activeProject?.name}</Text>
                                 </View>
                             </View>
                         </View>
-
                         <View style={styles.detailHeaderButtonsRow}>
                             <TouchableOpacity style={styles.secondaryButton} onPress={goBackToGrid}>
                                 <Text style={styles.secondaryButtonText}>← All Projects</Text>
@@ -148,27 +118,16 @@ export default function ProjectsScreen() {
                 )}
             </View>
 
-
-            {/* GRID VIEW */}
             {isGridView ? (
-                <ScrollView
-                    contentContainerStyle={styles.gridContent}
-                    showsVerticalScrollIndicator={false}
-                >
+                <ScrollView contentContainerStyle={styles.gridContent} showsVerticalScrollIndicator={false}>
                     {projects.length === 0 && (
-                        <Text style={styles.emptyText}>
-                            No projects yet. Tap &quot;New Project&quot; to get started.
-                        </Text>
+                        <Text style={styles.emptyText}>No projects yet. Tap "New Project" to get started.</Text>
                     )}
-
                     <View style={styles.grid}>
                         {projects.map((project) => {
                             const count = tasks.filter((t) => t.projectId === project.id).length;
-                            const completed = tasks.filter(
-                                (t) => t.projectId === project.id && t.done
-                            ).length;
-                            const pct =
-                                count === 0 ? 0 : Math.round((completed / count) * 100);
+                            const completed = tasks.filter((t) => t.projectId === project.id && t.done).length;
+                            const pct = count === 0 ? 0 : Math.round((completed / count) * 100);
 
                             return (
                                 <TouchableOpacity
@@ -177,201 +136,83 @@ export default function ProjectsScreen() {
                                     onPress={() => setActiveProject(project.id)}
                                     activeOpacity={0.9}
                                 >
-                                    {/* Folder icon with emoji */}
-                                    <View
-                                        style={[
-                                            styles.folderIcon,
-                                            { backgroundColor: project.color + "22" },
-                                        ]}
-                                    >
-                                        <View
-                                            style={[
-                                                styles.folderTab,
-                                                { backgroundColor: project.color },
-                                            ]}
-                                        />
-                                        <View
-                                            style={[
-                                                styles.folderBody,
-                                                { backgroundColor: project.color },
-                                            ]}
-                                        />
+                                    <View style={[styles.folderIcon, { backgroundColor: project.color + "22" }]}>
+                                        <View style={[styles.folderTab, { backgroundColor: project.color }]} />
+                                        <View style={[styles.folderBody, { backgroundColor: project.color }]} />
                                         <Text style={styles.folderEmoji}>{project.icon}</Text>
                                     </View>
-
                                     <Text style={styles.projectTitle}>{project.name}</Text>
-                                    <Text style={styles.projectMeta}>
-                                        {count} task{count === 1 ? "" : "s"} · {pct}% done
-                                    </Text>
+                                    <Text style={styles.projectMeta}>{count} tasks · {pct}% done</Text>
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
                 </ScrollView>
             ) : (
-                // PROJECT DETAIL VIEW
                 <View style={{ flex: 1 }}>
-                    <View style={{ flex: 1 }}>
-                        <ScrollView
-                            contentContainerStyle={{ paddingBottom: 120 }}
-                            showsVerticalScrollIndicator={false}
-                        >
-                            <View style={styles.tasksCard}>
-                                <Text style={styles.tasksCardTitle}>Tasks</Text>
-                                <TaskList
-                                    tasks={activeTasks}
-                                    onToggleTask={toggleTask}
-                                />
-                            </View>
-                        </ScrollView>
-
-                        {/* FAB for adding tasks inside project */}
-                        <AddTaskModal />
-                    </View>
-
-
-                    {/* FAB for adding tasks inside project */}
+                    <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+                        <View style={styles.tasksCard}>
+                            <Text style={styles.tasksCardTitle}>Tasks</Text>
+                            <TaskList tasks={activeTasks} onToggleTask={toggleTask} />
+                        </View>
+                    </ScrollView>
                     <AddTaskModal />
                 </View>
             )}
 
-            {/* CREATE PROJECT MODAL */}
+            {/* CREATE MODAL */}
             <Modal transparent visible={showCreateModal} animationType="fade">
                 <View style={styles.modalOuter}>
-                    <TouchableOpacity
-                        style={StyleSheet.absoluteFill}
-                        onPress={() => setShowCreateModal(false)}
-                        activeOpacity={1}
-                    />
+                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowCreateModal(false)} />
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>New Project</Text>
-
-                        <TextInput
-                            placeholder="Project name"
-                            value={projectName}
-                            onChangeText={setProjectName}
-                            style={styles.input}
-                        />
-
+                        <TextInput placeholder="Project name" value={projectName} onChangeText={setProjectName} style={styles.input} />
                         <Text style={styles.label}>Color</Text>
                         <View style={styles.colorRow}>
                             {COLOR_CHOICES.map((color) => (
-                                <TouchableOpacity
-                                    key={color}
-                                    onPress={() => setSelectedColor(color)}
-                                    style={[
-                                        styles.colorCircle,
-                                        { backgroundColor: color },
-                                        selectedColor === color && styles.colorCircleActive,
-                                    ]}
-                                />
+                                <TouchableOpacity key={color} onPress={() => setSelectedColor(color)} style={[styles.colorCircle, { backgroundColor: color }, selectedColor === color && styles.colorCircleActive]} />
                             ))}
                         </View>
-
                         <Text style={styles.label}>Icon</Text>
                         <View style={styles.iconRow}>
                             {ICON_CHOICES.map((icon) => (
-                                <TouchableOpacity
-                                    key={icon}
-                                    onPress={() => setSelectedIcon(icon)}
-                                    style={[
-                                        styles.iconChoice,
-                                        selectedIcon === icon && styles.iconChoiceActive,
-                                    ]}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.iconChoiceText,
-                                            selectedIcon === icon && styles.iconChoiceTextActive,
-                                        ]}
-                                    >
-                                        {icon}
-                                    </Text>
+                                <TouchableOpacity key={icon} onPress={() => setSelectedIcon(icon)} style={[styles.iconChoice, selectedIcon === icon && styles.iconChoiceActive]}>
+                                    <Text style={[styles.iconChoiceText, selectedIcon === icon && styles.iconChoiceTextActive]}>{icon}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
-
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => setShowCreateModal(false)}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.confirmButton} onPress={handleCreate}>
-                                <Text style={styles.confirmText}>Create</Text>
-                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowCreateModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity style={styles.confirmButton} onPress={handleCreate}><Text style={styles.confirmText}>Create</Text></TouchableOpacity>
                         </View>
                     </View>
                 </View>
             </Modal>
 
-            {/* EDIT PROJECT MODAL */}
+            {/* EDIT MODAL */}
             <Modal transparent visible={showEditModal} animationType="fade">
                 <View style={styles.modalOuter}>
-                    <TouchableOpacity
-                        style={StyleSheet.absoluteFill}
-                        onPress={() => setShowEditModal(false)}
-                        activeOpacity={1}
-                    />
+                    <TouchableOpacity style={StyleSheet.absoluteFill} onPress={() => setShowEditModal(false)} />
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>Edit Project</Text>
-
-                        <TextInput
-                            placeholder="Project name"
-                            value={editName}
-                            onChangeText={setEditName}
-                            style={styles.input}
-                        />
-
+                        <TextInput placeholder="Project name" value={editName} onChangeText={setEditName} style={styles.input} />
                         <Text style={styles.label}>Color</Text>
                         <View style={styles.colorRow}>
                             {COLOR_CHOICES.map((color) => (
-                                <TouchableOpacity
-                                    key={color}
-                                    onPress={() => setEditColor(color)}
-                                    style={[
-                                        styles.colorCircle,
-                                        { backgroundColor: color },
-                                        editColor === color && styles.colorCircleActive,
-                                    ]}
-                                />
+                                <TouchableOpacity key={color} onPress={() => setEditColor(color)} style={[styles.colorCircle, { backgroundColor: color }, editColor === color && styles.colorCircleActive]} />
                             ))}
                         </View>
-
                         <Text style={styles.label}>Icon</Text>
                         <View style={styles.iconRow}>
                             {ICON_CHOICES.map((icon) => (
-                                <TouchableOpacity
-                                    key={icon}
-                                    onPress={() => setEditIcon(icon)}
-                                    style={[
-                                        styles.iconChoice,
-                                        editIcon === icon && styles.iconChoiceActive,
-                                    ]}
-                                >
-                                    <Text
-                                        style={[
-                                            styles.iconChoiceText,
-                                            editIcon === icon && styles.iconChoiceTextActive,
-                                        ]}
-                                    >
-                                        {icon}
-                                    </Text>
+                                <TouchableOpacity key={icon} onPress={() => setEditIcon(icon)} style={[styles.iconChoice, editIcon === icon && styles.iconChoiceActive]}>
+                                    <Text style={[styles.iconChoiceText, editIcon === icon && styles.iconChoiceTextActive]}>{icon}</Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
-
                         <View style={styles.modalButtons}>
-                            <TouchableOpacity
-                                style={styles.cancelButton}
-                                onPress={() => setShowEditModal(false)}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.confirmButton} onPress={handleEditSave}>
-                                <Text style={styles.confirmText}>Save</Text>
-                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.cancelButton} onPress={() => setShowEditModal(false)}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
+                            <TouchableOpacity style={styles.confirmButton} onPress={handleEditSave}><Text style={styles.confirmText}>Save</Text></TouchableOpacity>
                         </View>
                     </View>
                 </View>
@@ -380,6 +221,7 @@ export default function ProjectsScreen() {
     );
 }
 
+// ... styles remain the same
 const CARD_RADIUS = 22;
 
 const styles = StyleSheet.create({

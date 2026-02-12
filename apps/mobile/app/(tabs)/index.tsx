@@ -7,8 +7,8 @@ import {
   StyleSheet,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { useTasks } from "../context/tasks";
-import type { Task } from "../context/tasks";
+import { useTasks } from "../../context/tasks";
+import type { Task } from "../../context/tasks";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import TaskList from "../../components/TaskList";
@@ -113,7 +113,7 @@ export default function DashboardScreen() {
                 style={styles.profileMenuItem}
                 onPress={() => {
                   setProfileMenuOpen(false);
-                  // router.push("/profile"); // Add route if you have one
+                  router.push("/profile"); 
                 }}
               >
                 <Text style={styles.profileMenuText}>Profile</Text>
@@ -123,7 +123,7 @@ export default function DashboardScreen() {
                 style={styles.profileMenuItem}
                 onPress={() => {
                   setProfileMenuOpen(false);
-                  // router.push("/settings"); // Add route if you have one
+                  router.push("/settings"); 
                 }}
               >
                 <Text style={styles.profileMenuText}>Settings</Text>

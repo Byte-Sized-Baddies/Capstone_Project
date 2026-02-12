@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from "expo-router";
 import Svg, { Path, Rect, Circle, Defs, ClipPath, G } from "react-native-svg";
-import { useTasks } from './context/tasks';
+import { useTasks } from '../context/tasks';
 
 // --- CUSTOM ICONS ---
 const BackIcon = () => (

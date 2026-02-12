@@ -17,50 +17,6 @@ import { useProjects } from "../context/projects";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 
-function normalizeDateInput(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const value = raw.trim();
-  if (!value) return null;
-
-  // already ISO: yyyy-mm-dd
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
-  }
-
-  // mm/dd[/yyyy] or mm-dd[-yyyy]
-  const mdMatch = value.match(
-    /^(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?$/
-  );
-  if (mdMatch) {
-    const month = parseInt(mdMatch[1], 10);
-    const day = parseInt(mdMatch[2], 10);
-    let year: number;
-
-    if (mdMatch[3]) {
-      const y = mdMatch[3];
-      year = y.length === 2 ? 2000 + parseInt(y, 10) : parseInt(y, 10);
-    } else {
-      year = new Date().getFullYear();
-    }
-
-    const d = new Date(year, month - 1, day);
-    if (!isNaN(d.getTime())) {
-      return d.toISOString().slice(0, 10); // YYYY-MM-DD
-    }
-  }
-
-  // fallback: return trimmed value (better than nothing)
-  return value;
-}
-
-function normalizeTimeInput(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const value = raw.trim();
-  if (!value) return null;
-  // For now just trim; you can add richer parsing later
-  return value;
-}
-
 export default function AddTaskModal() {
   const { addTask } = useTasks();
   const { projects, activeProjectId } = useProjects();
@@ -217,22 +173,50 @@ export default function AddTaskModal() {
               />
 
               {/* Due Date Section */}
-              <Text style={styles.label}>Due Date</Text>
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => setShowDatePicker(true)}
-              >
-                <Text style={{ color: dueDate ? "#111" : "#999" }}>
-                  {dueDate ? new Date(dueDate).toLocaleDateString() : "Select Date"}
-                </Text>
-              </TouchableOpacity>
+              {/* Deadlines Section */}
+              <View style={styles.row}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.label}>Due date</Text>
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => setShowDatePicker(true)}
+                  >
+                    <Text style={{ color: dueDate ? "#111" : "#999" }}>
+                      {dueDate ? new Date(dueDate).toLocaleDateString() : "Select Date"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
+                <View style={{ flex: 1, marginLeft: 8 }}>
+                  <Text style={styles.label}>Time</Text>
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => setShowTimePicker(true)}
+                  >
+                    <Text style={{ color: dueTime ? "#111" : "#999" }}>
+                      {dueTime || "Select Time"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Picker Components */}
               {showDatePicker && (
                 <DateTimePicker
                   value={dueDate ? new Date(dueDate) : new Date()}
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   onChange={onDateChange}
+                />
+              )}
+
+              {showTimePicker && (
+                <DateTimePicker
+                  value={new Date()}
+                  mode="time"
+                  is24Hour={false}
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={onTimeChange}
                 />
               )}
 

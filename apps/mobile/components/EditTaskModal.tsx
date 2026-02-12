@@ -151,26 +151,27 @@ export default function EditTaskModal({
                             multiline
                             textAlignVertical="top"
                         />
-
-                        {/* Due Date Section */}
-                        <Text style={styles.label}>Due Date</Text>
+                        {/* Due Time Section */}
+                        <Text style={styles.label}>Due Time</Text>
                         <TouchableOpacity
                             style={styles.input}
-                            onPress={() => setShowDatePicker(true)}
+                            onPress={() => setShowTimePicker(true)}
                         >
-                            <Text style={{ color: dueDate ? "#111" : "#999" }}>
-                                {dueDate ? new Date(dueDate).toLocaleDateString() : "Select Date"}
+                            <Text style={{ color: dueTime ? "#111" : "#999" }}>
+                                {dueTime || "Select Time"}
                             </Text>
                         </TouchableOpacity>
 
-                        {showDatePicker && (
+                        {showTimePicker && (
                             <DateTimePicker
-                                value={dueDate ? new Date(dueDate) : new Date()}
-                                mode="date"
+                                value={new Date()}
+                                mode="time"
+                                is24Hour={false}
                                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                onChange={onDateChange}
+                                onChange={onTimeChange}
                             />
                         )}
+
                         {/* Priority */}
                         <Text style={styles.label}>Priority</Text>
                         <View style={styles.priorityRow}>

@@ -1,0 +1,8 @@
+{
+  "android": {
+    "package": "com.anonymous.dobee"
+  },
+  "ios": {
+    "bundleIdentifier": "com.anonymous.dobee"
+  }
+}

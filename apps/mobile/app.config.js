@@ -29,7 +29,7 @@ export default ({ config }) => ({
   },
 
   ios: {
-    supportsTablet: true,
+
   },
 
   android: {

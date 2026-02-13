@@ -3,8 +3,8 @@ import 'dotenv/config';
 export default ({ config }) => ({
   ...config,
 
-  name: "mobile",
-  slug: "mobile",
+  name: "do-bee", // Updated for professional branding
+  slug: "do-bee", // Updated for professional branding
 
   // REQUIRED for Expo Router
   entryPoint: "./node_modules/expo-router/entry",
@@ -18,7 +18,7 @@ export default ({ config }) => ({
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "mobile",
+  scheme: "do-bee", // Updated to match your unique brand
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
 
@@ -29,10 +29,12 @@ export default ({ config }) => ({
   },
 
   ios: {
-
+    supportsTablet: true,
+    bundleIdentifier: "com.dobee.app" // Added for universal deployment
   },
 
   android: {
+    package: "com.dobee.app", // Added for universal deployment
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff",

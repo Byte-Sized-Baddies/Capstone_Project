@@ -2,9 +2,11 @@ import React, {
   createContext,
   useContext,
   useState,
+  useEffect,
   ReactNode,
   useCallback,
 } from "react";
+import { supabase } from "./supabaseClient";
 
 export type TaskPriority = "low" | "medium" | "high";
 
@@ -31,6 +33,7 @@ export type Task = {
   // Meta
   priority: TaskPriority;
   category?: string | null;
+  categoryId?: number | null;
   projectId?: string | null;
 
   attachments: TaskAttachment[];
@@ -69,6 +72,94 @@ const TasksContext = createContext<TasksContextType | undefined>(undefined);
 export function TasksProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
 
+  const priorityToInt = (p: TaskPriority) =>
+    p === "low" ? 0 : p === "medium" ? 1 : 2;
+
+  const intToPriority = (v: number): TaskPriority =>
+    v === 2 ? "high" : v === 1 ? "medium" : "low";
+
+  const resolveCategoryId = useCallback(async (userId: string, name?: string | null) => {
+    const n = name?.trim();
+    if (!n) return null;
+
+    const { data: existing, error: findError } = await supabase
+      .from("categories_v2")
+      .select("id")
+      .eq("user_id", userId)
+      .ilike("name", n)
+      .limit(1)
+      .maybeSingle();
+
+    if (findError) {
+      console.error("Category lookup failed:", findError);
+      return null;
+    }
+
+    if (existing?.id) return existing.id;
+
+    const { data: created, error: createError } = await supabase
+      .from("categories_v2")
+      .insert({ user_id: userId, name: n })
+      .select("id")
+      .single();
+
+    if (createError) {
+      console.error("Category create failed:", createError);
+      return null;
+    }
+
+    return created?.id ?? null;
+  }, []);
+
+  const loadTasks = useCallback(async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (userError || !user) return;
+
+    const { data: catRows, error: catError } = await supabase
+      .from("categories_v2")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    const categoryMap = new Map<number, string>();
+    if (!catError && catRows) {
+      catRows.forEach((c) => categoryMap.set(c.id, c.name));
+    }
+
+    const { data: taskRows, error: taskError } = await supabase
+      .from("tasks_v2")
+      .select("id, title, description, due_date, priority, is_completed, created_at, category_id")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (taskError || !taskRows) return;
+
+    const mapped: Task[] = taskRows.map((row) => {
+      const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? null : null;
+      return {
+        id: String(row.id),
+        title: row.title,
+        description: row.description ?? undefined,
+        done: !!row.is_completed,
+        createdAt: row.created_at ?? new Date().toISOString(),
+        dueDate: row.due_date ?? null,
+        dueTime: null,
+        priority: intToPriority(row.priority ?? 0),
+        category: categoryName,
+        categoryId: row.category_id ?? null,
+        projectId: null,
+        attachments: [],
+      };
+    });
+
+    setTasks(mapped);
+  }, []);
+
+  useEffect(() => {
+    loadTasks();
+  }, [loadTasks]);
+
   const addTask = useCallback(
     ({
       title,
@@ -82,47 +173,154 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     }: NewTaskInput) => {
       if (!title.trim()) return;
 
-      const newTask: Task = {
-        id:
-          typeof crypto !== "undefined" && "randomUUID" in crypto
-            ? crypto.randomUUID()
-            : Math.random().toString(36).slice(2),
-        title: title.trim(),
-        description: description?.trim(),
-        done: false,
-        createdAt: new Date().toISOString(),
-        dueDate: dueDate || null,
-        dueTime: dueTime || null,
-        priority,
-        category: category || null,
-        projectId: projectId || null,
-        attachments,
-      };
+      void (async () => {
+        const { data: userData, error: userError } = await supabase.auth.getUser();
+        const user = userData?.user;
+        if (userError || !user) return;
 
-      setTasks((prev) => [newTask, ...prev]);
+        const categoryId = await resolveCategoryId(user.id, category);
+
+        const { data, error } = await supabase
+          .from("tasks_v2")
+          .insert({
+            user_id: user.id,
+            category_id: categoryId,
+            title: title.trim(),
+            description: description?.trim() || null,
+            due_date: dueDate || null,
+            priority: priorityToInt(priority),
+            is_completed: false,
+          })
+          .select("id, created_at")
+          .single();
+
+        if (error || !data) {
+          console.error("Task insert failed:", error);
+          return;
+        }
+
+        const newTask: Task = {
+          id: String(data.id),
+          title: title.trim(),
+          description: description?.trim(),
+          done: false,
+          createdAt: data.created_at ?? new Date().toISOString(),
+          dueDate: dueDate || null,
+          dueTime: dueTime || null,
+          priority,
+          category: category || null,
+          categoryId,
+          projectId: projectId || null,
+          attachments,
+        };
+
+        setTasks((prev) => [newTask, ...prev]);
+      })();
     },
-    []
+    [resolveCategoryId]
   );
 
   const toggleTask = useCallback((id: string) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t))
-    );
-  }, []);
+    void (async () => {
+      const task = tasks.find((t) => t.id === id);
+      if (!task) return;
+
+      const nextDone = !task.done;
+      setTasks((prev) =>
+        prev.map((t) => (t.id === id ? { ...t, done: nextDone } : t))
+      );
+
+      const { error } = await supabase
+        .from("tasks_v2")
+        .update({ is_completed: nextDone })
+        .eq("id", Number(id));
+
+      if (error) {
+        console.error("Toggle failed:", error);
+        setTasks((prev) =>
+          prev.map((t) => (t.id === id ? { ...t, done: task.done } : t))
+        );
+      }
+    })();
+  }, [tasks]);
 
   const deleteTask = useCallback((id: string) => {
-    setTasks((prev) => prev.filter((t) => t.id !== id));
-  }, []);
+    void (async () => {
+      const prev = tasks;
+      setTasks((p) => p.filter((t) => t.id !== id));
+
+      const { error } = await supabase
+        .from("tasks_v2")
+        .delete()
+        .eq("id", Number(id));
+
+      if (error) {
+        console.error("Delete failed:", error);
+        setTasks(prev);
+      }
+    })();
+  }, [tasks]);
 
   const updateTask = useCallback((id: string, updates: UpdateTaskInput) => {
-    setTasks((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
-    );
-  }, []);
+    void (async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (userError || !user) return;
+
+      const categoryId = await resolveCategoryId(user.id, updates.category);
+
+      const payload: Record<string, unknown> = {};
+      if (updates.title !== undefined) payload.title = updates.title.trim();
+      if (updates.description !== undefined)
+        payload.description = updates.description?.trim() || null;
+      if (updates.dueDate !== undefined) payload.due_date = updates.dueDate || null;
+      if (updates.priority !== undefined)
+        payload.priority = priorityToInt(updates.priority);
+      if (updates.done !== undefined) payload.is_completed = updates.done;
+      if (updates.category !== undefined) payload.category_id = categoryId;
+
+      const { error } = await supabase
+        .from("tasks_v2")
+        .update(payload)
+        .eq("id", Number(id));
+
+      if (error) {
+        console.error("Update failed:", error);
+        return;
+      }
+
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === id
+            ? {
+                ...t,
+                ...updates,
+                categoryId,
+              }
+            : t
+        )
+      );
+    })();
+  }, [resolveCategoryId]);
 
   const clearCompleted = useCallback(() => {
-    setTasks((prev) => prev.filter((t) => !t.done));
-  }, []);
+    void (async () => {
+      const completedIds = tasks.filter((t) => t.done).map((t) => Number(t.id));
+      if (completedIds.length === 0) return;
+
+      const { error } = await supabase
+        .from("tasks_v2")
+        .delete()
+        .in("id", completedIds);
+
+      if (error) {
+        console.error("Clear completed failed:", error);
+        return;
+      }
+
+      setTasks((prev) => prev.filter((t) => !t.done));
+    })();
+  }, [tasks]);
 
   const setAllTasks = useCallback((next: Task[]) => {
     setTasks(next);

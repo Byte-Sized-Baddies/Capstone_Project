@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUpWithEmail, signInWithOAuth } from "../auth/auth";
 
@@ -129,9 +130,9 @@ export default function SignUpPage() {
 
         <p className="mt-5 text-sm text-center">
           Already have an account?{" "}
-          <a href="/" className="underline font-medium">
+          <Link href="/" className="underline font-medium">
             Sign In
-          </a>
+          </Link>
         </p>
       </div>
     </main>

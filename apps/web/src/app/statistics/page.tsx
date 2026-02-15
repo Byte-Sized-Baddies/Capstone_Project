@@ -1,6 +1,8 @@
 // app/statistics/page.tsx
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
+import { handleLogout } from "../auth/auth"; // adjust path
 import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
@@ -15,9 +17,11 @@ export default function StatisticsPage() {
 
   const [invites, setInvites] = useState<string[]>([]);
 
-  const [tasks, setTasks] = useState<any[]>([]);
-
-  const searchRef = useRef<HTMLInputElement>(null);
+  type Task = {
+    category: string;
+    done: boolean;
+  };
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [rawSearch, setRawSearch] = useState("");
 
   const [loading, setLoading] = useState(true);

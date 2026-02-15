@@ -1,9 +1,13 @@
 "use client";
 import React, { useEffect, useState, useRef } from "react";
-import { handleLogout } from "../auth/auth.ts"; // adjust path
+import Image from "next/image";
+import { handleLogout } from "../auth/auth"; // adjust path
+import { supabase } from "../auth/supabaseClient";
 
 const LIGHT_PINK = "#ffd6e8";
 const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Other"];
+
+type Category = { id: number; name: string };
 
 export default function SettingsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -11,7 +15,7 @@ export default function SettingsPage() {
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("Kyathi Uyyala");
 
-  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [invites, setInvites] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
 
@@ -20,18 +24,16 @@ export default function SettingsPage() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [rawSearch, setRawSearch] = useState("");
 
-  const categoryList = [...presetCategories, ...customCategories];
+  const categoryList = [...presetCategories, ...customCategories.map((c) => c.name)];
 
   // Load from storage
   useEffect(() => {
     const a = localStorage.getItem("avatar");
     const n = localStorage.getItem("displayName");
-    const c = localStorage.getItem("categories");
     const i = localStorage.getItem("invites");
 
     if (a) setAvatarDataUrl(a);
     if (n) setDisplayName(n);
-    if (c) try { setCustomCategories(JSON.parse(c)); } catch {}
     if (i) try { setInvites(JSON.parse(i)); } catch {}
 
     if (typeof Notification !== "undefined") {
@@ -48,9 +50,29 @@ export default function SettingsPage() {
     if (displayName) localStorage.setItem("displayName", displayName);
   }, [displayName]);
 
+  // Load categories from Supabase
   useEffect(() => {
-    localStorage.setItem("categories", JSON.stringify(customCategories));
-  }, [customCategories]);
+    const loadCategories = async () => {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (userError || !user) return;
+
+      const { data, error } = await supabase
+        .from("categories_v2")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Failed to load categories:", error);
+        return;
+      }
+
+      setCustomCategories(data ?? []);
+    };
+
+    loadCategories();
+  }, []);
 
   const onAvatarUpload = (file?: File) => {
     if (!file) return;
@@ -62,16 +84,55 @@ export default function SettingsPage() {
   const getInitials = (n = displayName) =>
     n.split(" ").map(x => x[0]).slice(0, 2).join("").toUpperCase();
 
-  const addCategory = () => {
+  const addCategory = async () => {
     const v = newCategory.trim();
     if (!v) return;
     if (categoryList.includes(v)) return alert("Category already exists");
-    setCustomCategories(prev => [...prev, v]);
+
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (userError || !user) {
+      alert("You are not logged in. Please log in and try again.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("categories_v2")
+      .insert({ user_id: user.id, name: v })
+      .select("id, name")
+      .single();
+
+    if (error) {
+      console.error("Category insert failed:", error);
+      alert(`Failed to create category: ${error.message}`);
+      return;
+    }
+
+    if (!data) return;
+
+    setCustomCategories((prev) => [...prev, data]);
     setNewCategory("");
   };
 
-  const removeCategory = (cat: string) =>
-    setCustomCategories(prev => prev.filter(c => c !== cat));
+  const removeCategory = async (cat: Category) => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (userError || !user) return;
+
+    const { error } = await supabase
+      .from("categories_v2")
+      .delete()
+      .eq("id", cat.id)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error("Category delete failed:", error);
+      alert(`Failed to remove category: ${error.message}`);
+      return;
+    }
+
+    setCustomCategories((prev) => prev.filter((c) => c.id !== cat.id));
+  };
 
   const removeInvite = (email: string) => {
     const filtered = invites.filter(i => i !== email);
@@ -141,7 +202,14 @@ export default function SettingsPage() {
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
             {avatarDataUrl ? (
-              <img src={avatarDataUrl} alt="avatar" className="w-14 h-14 rounded-full object-cover shadow" />
+              <Image
+                src={avatarDataUrl}
+                alt="User avatar"
+                width={56}
+                height={56}
+                unoptimized
+                className="w-14 h-14 rounded-full object-cover shadow"
+              />
             ) : (
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">
                 {getInitials()}
@@ -298,7 +366,14 @@ export default function SettingsPage() {
 
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
               {avatarDataUrl ? (
-                <img src={avatarDataUrl} className="w-8 h-8 rounded-full object-cover" />
+                <Image
+                  src={avatarDataUrl}
+                  alt="User avatar"
+                  width={32}
+                  height={32}
+                  unoptimized
+                  className="w-8 h-8 rounded-full object-cover"
+                />
               ) : (
                 <span className="font-semibold">{getInitials()}</span>
               )}
@@ -316,7 +391,14 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <div className="relative">
                 {avatarDataUrl ? (
-                  <img src={avatarDataUrl} className="h-20 w-20 rounded-full object-cover shadow" />
+                  <Image
+                    src={avatarDataUrl}
+                    alt="User avatar"
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="h-20 w-20 rounded-full object-cover shadow"
+                  />
                 ) : (
                   <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center text-lg font-bold shadow">
                     {getInitials()}
@@ -400,8 +482,8 @@ export default function SettingsPage() {
               {customCategories.length === 0 && <p className="text-sm">No custom categories yet.</p>}
 
               {customCategories.map(cat => (
-                <li key={cat} className="flex items-center justify-between bg-[#fff6f9] p-2 rounded-xl border">
-                  <span>{cat}</span>
+                <li key={cat.id} className="flex items-center justify-between bg-[#fff6f9] p-2 rounded-xl border">
+                  <span>{cat.name}</span>
                   <button
                     onClick={() => removeCategory(cat)}
                     className="px-2 py-1 text-xs rounded-lg bg-red-100 hover:bg-red-200"

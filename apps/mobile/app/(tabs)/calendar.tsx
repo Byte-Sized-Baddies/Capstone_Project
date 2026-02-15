@@ -16,7 +16,7 @@ type ViewMode = "5day" | "week" | "month";
 const GRAY = "#9CA3AF";
 
 export default function CalendarScreen() {
-    const { tasks } = useTasks();
+    const { tasks, toggleTask } = useTasks();
     const { projects } = useProjects();
 
     const today = useMemo(() => new Date(), []);
@@ -171,7 +171,8 @@ export default function CalendarScreen() {
                             No tasks yet. Tap the + button to add your first one.
                         </Text>
                     ) : (
-                        <TaskList tasks={tasksForSelected} />
+                        <TaskList tasks={tasksForSelected} 
+                            onToggleTask={toggleTask} />
                     )}
                 </View>
             </ScrollView>
@@ -333,18 +334,27 @@ function MonthGrid({
 /* ---------- Helpers ---------- */
 
 // tasks use "mm/dd/yyyy" or null
-function toDateKey(dueDate?: string | null): string | null {
+/* ---------- Helpers ---------- */
+
+// 1. Fix: Treat the string literally to avoid timezone shifts
+function toDateKey(dueDate?: string | Date | null): string | null {
     if (!dueDate) return null;
-    const parts = dueDate.split("/");
-    if (parts.length !== 3) return null;
-    const [mm, dd, yyyy] = parts;
-    const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-    if (isNaN(date.getTime())) return null;
-    return toDateKeyFromDate(date);
+    if (typeof dueDate === 'string') {
+        return dueDate.substring(0, 10);
+    }
+
+    if (dueDate instanceof Date) {
+        return toDateKeyFromDate(dueDate);
+    }
+
+    return null;
 }
 
 function toDateKeyFromDate(date: Date): string {
-    return date.toISOString().slice(0, 10); // YYYY-MM-DD
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
 }
 
 function addDays(d: Date, days: number): Date {

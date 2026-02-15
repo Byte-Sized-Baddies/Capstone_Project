@@ -1,3 +1,5 @@
+import HoneyToast from "../../components/HoneyToast";
+
 import React, {
   createContext,
   useContext,
@@ -5,6 +7,7 @@ import React, {
   useEffect,
   ReactNode,
   useCallback,
+  useRef,
 } from "react";
 import { supabase } from "./supabaseClient";
 
@@ -25,6 +28,8 @@ export type Task = {
   description?: string;
   done: boolean;
   createdAt: string;
+
+  completedAt?: string | null;
 
   // Deadlines / scheduling
   dueDate?: string | null; // e.g. "2025-11-18" or ISO date
@@ -58,20 +63,40 @@ type TasksContextType = {
   addTask: (input: NewTaskInput) => void;
   toggleTask: (id: string) => void;
   deleteTask: (id: string) => void;
-
   // NEW
   updateTask: (id: string, updates: UpdateTaskInput) => void;
   clearCompleted: () => void;
 
   // Optional but useful when you wire in Supabase / AsyncStorage
   setAllTasks: (tasks: Task[]) => void;
+  dailyGoal: number;
+  setDailyGoal: (n: number) => void;
 };
 
 const TasksContext = createContext<TasksContextType | undefined>(undefined);
 
 export function TasksProvider({ children }: { children: ReactNode }) {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [toastVisible, setToastVisible] = useState(false);
+  const [dailyCount, setDailyCount] = useState(0);
 
+  //for the goal honeycomb 
+  const[dailyGoal, setDailyGoal] = useState(5);
+  // Use 'number' because React Native timers are just IDs
+  const toastTimer = useRef<number | null>(null);
+
+
+  // Helper to check if a date string is "today"
+  const isToday = (dateStr?: string | null) => {
+    if (!dateStr) return false;
+    const d = new Date(dateStr);
+    const today = new Date();
+    return (
+      d.getDate() === today.getDate() &&
+      d.getMonth() === today.getMonth() &&
+      d.getFullYear() === today.getFullYear()
+    );
+  };
   const priorityToInt = (p: TaskPriority) =>
     p === "low" ? 0 : p === "medium" ? 1 : 2;
 
@@ -219,8 +244,46 @@ export function TasksProvider({ children }: { children: ReactNode }) {
     },
     [resolveCategoryId]
   );
-
   const toggleTask = useCallback((id: string) => {
+    setTasks((prev) => {
+      // Find the task to see if we are completing it or un-completing it
+      const target = prev.find(t => t.id === id);
+      if (!target) return prev;
+
+      const isNowDone = !target.done;
+
+      // If we just finished a task, trigger the banner!
+      if (isNowDone) {
+        // Calculate how many are done for today (including this one)
+        const currentToday = prev.filter(t => t.done && isToday(t.completedAt)).length;
+        const newCount = currentToday + 1;
+
+        // Trigger Banner (using setTimeout to avoid render clashes)
+        setTimeout(() => {
+          setDailyCount(newCount);
+          setToastVisible(true);
+
+          // Auto-hide after 2.5 seconds
+          if (toastTimer.current) clearTimeout(toastTimer.current);
+          toastTimer.current = setTimeout(() => {
+            setToastVisible(false);
+          }, 2500);
+        }, 50);
+      }
+
+      return prev.map((t) => {
+        if (t.id === id) {
+          return {
+            ...t,
+            done: isNowDone,
+            // Save timestamp
+            completedAt: isNowDone ? new Date().toISOString() : null
+          };
+        }
+        return t;
+      });
+    });
+  }, []);
     void (async () => {
       const task = tasks.find((t) => t.id === id);
       if (!task) return;
@@ -336,9 +399,16 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         updateTask,
         clearCompleted,
         setAllTasks,
+        dailyGoal,
+        setDailyGoal,
       }}
     >
       {children}
+      <HoneyToast
+        visible={toastVisible}
+        count={dailyCount}
+        goal={dailyGoal}
+      />
     </TasksContext.Provider>
   );
 }

@@ -1,244 +1,292 @@
-import React from "react";
+// apps/mobile/components/TaskList.tsx
+import React, { useMemo } from "react";
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  FlatList,
 } from "react-native";
-// ✅ components and context are siblings, so use ../context/tasks
-import { useTasks, Task } from "../app/context/tasks";
+import { Task } from "../app/context/tasks";
+import { useProjects } from "../app/context/projects";
 
-type Props = {
-  tasks?: Task[];
-  // optional callbacks for future edit screen or custom behavior
-  onTaskPress?: (task: Task) => void;
-  onTaskLongPress?: (task: Task) => void;
+// Minimal project shape we care about
+type ProjectLike = {
+  id: string;
+  name: string;
+  color?: string | null;
+  icon?: string | null;
 };
 
-function getFriendlyDueLabel(dueDate?: string | null) {
-  if (!dueDate) return null;
+type TaskListProps = {
+  tasks: Task[];
+  onToggleTask?: (id: string) => void;
+  onPressTask?: (task: Task) => void;
+};
 
-  // expects YYYY-MM-DD (what we normalized in AddTaskModal)
-  const todayKey = new Date().toISOString().slice(0, 10);
-  if (dueDate === todayKey) return "Today";
+export default function TaskList({
+  tasks,
+  onToggleTask,
+  onPressTask,
+}: TaskListProps) {
+  const { projects } = useProjects() as { projects: ProjectLike[] };
 
-  const today = new Date(todayKey);
-  const target = new Date(dueDate);
+  const projectMap = useMemo(() => {
+    const map = new Map<string, ProjectLike>();
+    projects?.forEach((p) => map.set(p.id, p));
+    return map;
+  }, [projects]);
 
-  const msPerDay = 1000 * 60 * 60 * 24;
-  const diffDays = Math.round(
-    (target.getTime() - today.getTime()) / msPerDay
-  );
-
-  if (diffDays === 1) return "Tomorrow";
-  if (diffDays === -1) return "Yesterday";
-  if (diffDays < 0) return `${Math.abs(diffDays)} day(s) ago`;
-
-  // Fallback: basic date string
-  return target.toLocaleDateString();
-}
-
-export default function TaskList({ tasks: override, onTaskPress, onTaskLongPress }: Props) {
-  const { tasks, toggleTask } = useTasks();
-  const data = override ?? tasks;
-
-  if (data.length === 0) {
+  if (tasks.length === 0) {
     return (
-      <View style={{ paddingVertical: 12 }}>
-        <Text style={{ color: "#888", fontSize: 13 }}>
-          No tasks yet. Tap the + button to add your first one.
-        </Text>
+      <View style={styles.emptyWrapper}>
+        <Text style={styles.emptyText}>No tasks yet. Add your first one!</Text>
       </View>
     );
   }
 
-  const renderItem = ({ item }: { item: Task }) => {
-    const priorityColor =
-      item.priority === "high"
-        ? "#f97373"
-        : item.priority === "medium"
-          ? "#facc6b"
-          : "#86efac";
+  return (
+    <View style={styles.listContainer}>
+      {tasks.map((item) => {
+        const priorityLabel = item.priority.toUpperCase();
+        const priorityColor =
+          item.priority === "high"
+            ? "#ef4444" // red
+            : item.priority === "medium"
+              ? "#f59e0b" // amber
+              : "#22c55e"; // green
 
-    const hasAttachments = item.attachments?.length > 0;
-    const friendlyDue = getFriendlyDueLabel(item.dueDate);
+        const priorityBg = priorityColor + "1A";
 
-    const handlePress = () => {
-      if (onTaskPress) {
-        onTaskPress(item);
-      } else {
-        // default behavior: toggle done
-        toggleTask(item.id);
-      }
-    };
+        const project = item.projectId
+          ? projectMap.get(item.projectId)
+          : undefined;
+        const projectColor = project?.color ?? "#6366f1";
+        const projectBg = projectColor + "1A";
 
-    const handleLongPress = () => {
-      if (onTaskLongPress) {
-        onTaskLongPress(item);
-      }
-      // otherwise, no-op for now (you can later hook this to open an edit modal)
-    };
-
-    return (
-      <TouchableOpacity
-        onPress={handlePress}
-        onLongPress={handleLongPress}
-        style={[styles.row, item.done && { opacity: 0.5 }]}
-      >
-        <View style={styles.checkbox}>
-          {item.done && <Text style={{ fontSize: 12 }}>✓</Text>}
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text
-            style={[
-              styles.title,
-              item.done && { textDecorationLine: "line-through" },
-            ]}
-          >
-            {item.title}
-          </Text>
-
-          {!!item.description && (
-            <Text style={styles.description} numberOfLines={1}>
-              {item.description}
-            </Text>
-          )}
-
-          <View style={styles.metaRow}>
-            {/* Priority */}
-            <View
+        return (
+          <View key={item.id} style={styles.card}>
+            {/* LEFT: toggle circle */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={() => onToggleTask?.(item.id)}
               style={[
-                styles.pill,
-                { backgroundColor: priorityColor + "33" },
+                styles.checkbox,
+                item.done && [
+                  styles.checkboxDone,
+                  { borderColor: priorityColor },
+                ],
+                !item.done && { borderColor: "#d4d4d8" },
               ]}
             >
-              <View
-                style={[
-                  styles.pillDot,
-                  { backgroundColor: priorityColor },
-                ]}
-              />
-              <Text style={styles.pillText}>
-                {item.priority.charAt(0).toUpperCase() +
-                  item.priority.slice(1)}{" "}
-                priority
+              {item.done && <Text style={styles.checkboxCheck}>✓</Text>}
+            </TouchableOpacity>
+
+            {/* MIDDLE: main content tap opens edit modal */}
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.content}
+              onPress={() => onPressTask?.(item)}
+            >
+              <Text
+                style={[styles.title, item.done && styles.titleDone]}
+                numberOfLines={1}
+              >
+                {item.title}
               </Text>
-            </View>
 
-            {/* Category */}
-            {item.category && (
-              <View style={styles.pill}>
-                <Text style={styles.pillText}>{item.category}</Text>
-              </View>
-            )}
+              {/* metadata row */}
+              {(item.dueDate ||
+                item.attachments.length > 0 ||
+                project ||
+                item.priority) && (
+                  <View style={styles.metaRow}>
+                    {/* priority pill */}
+                    <View
+                      style={[styles.priorityPill, { backgroundColor: priorityBg }]}
+                    >
+                      <View
+                        style={[
+                          styles.priorityDot,
+                          { backgroundColor: priorityColor },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          styles.priorityText,
+                          { color: priorityColor },
+                        ]}
+                      >
+                        {priorityLabel}
+                      </Text>
+                    </View>
 
-            {/* Project */}
-            {item.projectId && (
-              <View style={styles.pill}>
-                {/* later you can swap id -> name by passing project in */}
-                <Text style={styles.pillText}>📂 {item.projectId}</Text>
-              </View>
-            )}
+                    {/* due date */}
+                    {item.dueDate && (
+                      <View style={styles.metaChip}>
+                        <Text style={styles.metaEmoji}>📅</Text>
+                        <Text style={styles.metaText}>{item.dueDate}</Text>
+                      </View>
+                    )}
+
+                    {/* attachments */}
+                    {item.attachments.length > 0 && (
+                      <View style={styles.metaChip}>
+                        <Text style={styles.metaEmoji}>📎</Text>
+                        <Text style={styles.metaText}>
+                          {item.attachments.length}
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* project pill */}
+                    {project && (
+                      <View
+                        style={[
+                          styles.metaChip,
+                          { backgroundColor: projectBg, maxWidth: "55%" },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.metaEmoji,
+                            { color: projectColor, marginRight: 4 },
+                          ]}
+                        >
+                          {project.icon || "📁"}
+                        </Text>
+                        <Text
+                          style={[
+                            styles.metaText,
+                            { color: projectColor },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {project.name}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                )}
+
+              {/* optional short description under metadata */}
+              {item.description && (
+                <Text style={styles.description} numberOfLines={1}>
+                  {item.description}
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
-
-          <View style={styles.metaRow}>
-            {/* Deadlines */}
-            {(item.dueDate || item.dueTime) && (
-              <Text style={styles.dueText}>
-                Due{" "}
-                {friendlyDue
-                  ? friendlyDue
-                  : item.dueDate
-                    ? item.dueDate
-                    : ""}
-                {item.dueTime ? ` · ${item.dueTime}` : ""}
-              </Text>
-            )}
-
-            {/* Attachments */}
-            {hasAttachments && (
-              <Text style={styles.attachInfo}>
-                📎 {item.attachments.length} attachment
-                {item.attachments.length > 1 ? "s" : ""}
-              </Text>
-            )}
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  return (
-    <FlatList
-      data={data}
-      keyExtractor={(item) => item.id}
-      renderItem={renderItem}
-      ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
-      scrollEnabled={false}
-    />
+        );
+      })}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: "row",
-    paddingVertical: 10,
-    paddingHorizontal: 4,
-    borderRadius: 16,
+  listContainer: {
+    paddingTop: 8,
+    paddingBottom: 16,
   },
+
+  emptyWrapper: {
+    paddingVertical: 24,
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 13,
+    color: "#9ca3af",
+  },
+
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: 18,
+    backgroundColor: "#f4f4f8",
+    marginBottom: 10,
+  },
+
   checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.2,
-    borderColor: "#bbb",
+    width: 24,
+    height: 24,
+    borderRadius: 999,
+    borderWidth: 2,
     justifyContent: "center",
     alignItems: "center",
     marginRight: 12,
+    backgroundColor: "#fff",
   },
+  checkboxDone: {
+    backgroundColor: "#111827",
+  },
+  checkboxCheck: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  content: {
+    flex: 1,
+  },
+
   title: {
     fontSize: 15,
-    fontWeight: "500",
+    fontWeight: "600",
+    color: "#111827",
   },
-  description: {
-    fontSize: 13,
-    color: "#777",
-    marginTop: 2,
+  titleDone: {
+    color: "#9ca3af",
+    textDecorationLine: "line-through",
   },
+
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
-    flexWrap: "wrap",
-    gap: 6,
     marginTop: 6,
+    gap: 6,
+    flexWrap: "wrap",
   },
-  pill: {
+
+  priorityPill: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 999,
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: "#f3f3f5",
+    paddingVertical: 4,
+    borderRadius: 999,
   },
-  pillDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 4,
+  priorityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    marginRight: 5,
   },
-  pillText: {
+  priorityText: {
     fontSize: 11,
-    color: "#555",
+    fontWeight: "600",
   },
-  dueText: {
-    fontSize: 11,
-    color: "#999",
+
+  metaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "#e5e7eb",
   },
-  attachInfo: {
+  metaEmoji: {
     fontSize: 11,
-    color: "#666",
-    marginLeft: 8,
+    marginRight: 2,
+  },
+  metaText: {
+    fontSize: 11,
+    color: "#4b5563",
+    fontWeight: "500",
+  },
+
+  description: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginTop: 4,
   },
 });

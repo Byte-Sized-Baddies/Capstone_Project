@@ -13,13 +13,14 @@ interface Task {
   id: number;
   text: string;
   description: string;
-  due: string; // "YYYY-MM-DD" or "No date"
+  due: string;
   done: boolean;
   status: Status;
   created: number;
   priority: Priority;
   category: string;
   categoryId: number | null;
+  folderId?: number | null;
 }
 
 type Category = { id: number; name: string };
@@ -32,21 +33,43 @@ const intToPriority = (v: number): Priority =>
 
 const priorityOptions: Priority[] = ["Low", "Medium", "High"];
 
+type Folder = {
+  id: number;
+  name: string;
+  owner: string;
+  collaborators: string[];
+  created: number;
+};
+
+const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Other"];
 const LIGHT_PINK = "#ffd6e8";
 
 export default function DashboardPage() {
   const router = useRouter();
-  // tasks & persistence
+  
+  // User state
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [displayName, setDisplayName] = useState<string>("User");
+  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
+
+  // Tasks & folders
   const [tasks, setTasks] = useState<Task[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [customCategories, setCustomCategories] = useState<string[]>([]);
+  const categoryList = [...presetCategories, ...customCategories];
 
-  // UI
+  // UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false);
+  const [showShareFolderModal, setShowShareFolderModal] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
+  const [selectedFolder, setSelectedFolder] = useState<number | null>(null);
+  const [activeFolderForShare, setActiveFolderForShare] = useState<number | null>(null);
 
-  // form states
+  // Form states
   const [newTask, setNewTask] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [newDue, setNewDue] = useState("");
@@ -54,39 +77,24 @@ export default function DashboardPage() {
   const [newCategory, setNewCategory] = useState("");
   const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
   const [newStatus, setNewStatus] = useState<Status>("not_started");
+  const [newTaskFolder, setNewTaskFolder] = useState<number | null>(null);
 
-  // invite
-  const [invites, setInvites] = useState<string[]>([]);
-  const [inviteEmail, setInviteEmail] = useState("");
+  // Folder form
+  const [newFolderName, setNewFolderName] = useState("");
+  const [shareEmail, setShareEmail] = useState("");
 
-  // avatar
-  const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string>("Kyathi Uyyala");
-
-  // filters + search + sort (URL-synced)
+  // Filters
   const [rawSearch, setRawSearch] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"All" | string>("All");
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("All");
-  const [dateFilter, setDateFilter] = useState<string>(""); // "" or YYYY-MM-DD or "today"
+  const [priorityFilter, setPriorityFilter] = useState<"All" | "Low" | "Medium" | "High">("All");
+  const [dateFilter, setDateFilter] = useState<string>("");
   const [sortBy, setSortBy] = useState("added");
 
   const searchRef = useRef<HTMLInputElement | null>(null);
 
-  // Logout
-const handleLogout = async () => {
-    console.log("LOGOUT button clicked");
-    await supabase.auth.signOut();
-    localStorage.removeItem("tasks");
-    localStorage.removeItem("categories");
-    localStorage.removeItem("invites");
-    localStorage.removeItem("avatar");
-    localStorage.removeItem("displayName");
-    router.push("/login");
-  };
-
   // Session Check
-useEffect(() => {
+  useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) {
@@ -94,6 +102,7 @@ useEffect(() => {
         return;
       }
       const user = data.session.user;
+      setUserEmail(user.email || "");
       const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       setDisplayName(name);
     };
@@ -109,24 +118,44 @@ useEffect(() => {
     };
   }, [router]);
 
-  // debounce search UI (friendly)
+  // Logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem("tasks");
+    localStorage.removeItem("folders");
+    localStorage.removeItem("categories");
+    localStorage.removeItem("avatar");
+    localStorage.removeItem("displayName");
+    router.push("/login");
+  };
+
+  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setSearchQuery(rawSearch.trim()), 280);
     return () => clearTimeout(t);
   }, [rawSearch]);
 
-  // load saved state
+  // Load saved state
   useEffect(() => {
-    const savedInv = localStorage.getItem("invites");
+    const saved = localStorage.getItem("tasks");
+    const savedFolders = localStorage.getItem("folders");
+    const savedCat = localStorage.getItem("categories");
     const savedAvatar = localStorage.getItem("avatar");
     const savedName = localStorage.getItem("displayName");
-    if (savedInv) {
-      try { setInvites(JSON.parse(savedInv)); } catch { setInvites([]); }
+    
+    if (saved) {
+      try { setTasks(JSON.parse(saved)); } catch { setTasks([]); }
+    }
+    if (savedFolders) {
+      try { setFolders(JSON.parse(savedFolders)); } catch { setFolders([]); }
+    }
+    if (savedCat) {
+      try { setCustomCategories(JSON.parse(savedCat)); } catch { setCustomCategories([]); }
     }
     if (savedAvatar) setAvatarDataUrl(savedAvatar);
     if (savedName) setDisplayName(savedName);
 
-    // load url params
+    // Load URL params
     const params = new URLSearchParams(window.location.search);
     setRawSearch(params.get("q") ?? "");
     setCategoryFilter(params.get("cat") ?? "All");
@@ -135,12 +164,8 @@ useEffect(() => {
     setDateFilter(params.get("d") ?? "");
     setSortBy(params.get("s") ?? "added");
 
-  }, []);
 
-  // persist
-  useEffect(() => localStorage.setItem("invites", JSON.stringify(invites)), [invites]);
-  useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
-  useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
+  }, []);
 
   // load categories + tasks from Supabase
   useEffect(() => {
@@ -194,7 +219,15 @@ useEffect(() => {
     loadCategoriesAndTasks();
   }, [newCategoryId]);
 
-  // sync filters to URL
+
+  // Persist state
+  useEffect(() => localStorage.setItem("tasks", JSON.stringify(tasks)), [tasks]);
+  useEffect(() => localStorage.setItem("folders", JSON.stringify(folders)), [folders]);
+  useEffect(() => localStorage.setItem("categories", JSON.stringify(customCategories)), [customCategories]);
+  useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
+  useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
+
+  // Sync filters to URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (rawSearch) params.set("q", rawSearch);
@@ -211,7 +244,79 @@ useEffect(() => {
     window.history.replaceState({}, "", newUrl);
   }, [rawSearch, categoryFilter, priorityFilter, dateFilter, sortBy]);
 
-  // helpers: reset form
+  // Folder management
+  const createFolder = () => {
+    const name = newFolderName.trim();
+    if (!name) return alert("Please enter a folder name");
+    
+    const folder: Folder = {
+      id: Date.now(),
+      name,
+      owner: userEmail,
+      collaborators: [],
+      created: Date.now()
+    };
+    
+    setFolders(prev => [folder, ...prev]);
+    setNewFolderName("");
+    setShowCreateFolderModal(false);
+  };
+
+  const deleteFolder = (folderId: number) => {
+    if (!confirm("Delete this folder? Tasks will be moved to 'All Tasks'.")) return;
+    
+    // Move tasks out of folder
+    setTasks(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: null } : t));
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+    
+    if (selectedFolder === folderId) {
+      setSelectedFolder(null);
+    }
+  };
+
+  const shareFolder = () => {
+    const email = shareEmail.trim().toLowerCase();
+    if (!email) return alert("Please enter an email");
+    if (!activeFolderForShare) return;
+    
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!re.test(email)) return alert("Please enter a valid email");
+    
+    if (email === userEmail) return alert("You can't share with yourself");
+    
+    setFolders(prev => prev.map(f => {
+      if (f.id === activeFolderForShare) {
+        if (f.collaborators.includes(email)) {
+          alert("Already shared with this user");
+          return f;
+        }
+        alert(`Folder shared with ${email}`);
+        return { ...f, collaborators: [...f.collaborators, email] };
+      }
+      return f;
+    }));
+    
+    setShareEmail("");
+    setShowShareFolderModal(false);
+    setActiveFolderForShare(null);
+  };
+
+  const removeCollaborator = (folderId: number, email: string) => {
+    if (!confirm(`Remove ${email} from this folder?`)) return;
+    
+    setFolders(prev => prev.map(f => {
+      if (f.id === folderId) {
+        return { ...f, collaborators: f.collaborators.filter(c => c !== email) };
+      }
+      return f;
+    }));
+  };
+
+  const canEditFolder = (folder: Folder) => {
+    return folder.owner === userEmail || folder.collaborators.includes(userEmail);
+  };
+
+  // Task management
   const resetForm = () => {
     setNewTask("");
     setNewDescription("");
@@ -221,6 +326,7 @@ useEffect(() => {
     setNewCategory(firstCategory?.name ?? "");
     setNewCategoryId(firstCategory?.id ?? null);
     setNewStatus("not_started");
+    setNewTaskFolder(selectedFolder);
     setEditId(null);
   };
 
@@ -282,6 +388,7 @@ useEffect(() => {
           priority: newPriority,
           category: newCategory,
           categoryId: newCategoryId,
+          folderId: newTaskFolder
         };
         setTasks(prev => [t, ...prev]);
       }
@@ -299,6 +406,7 @@ useEffect(() => {
     setNewCategory(task.category);
     setNewCategoryId(task.categoryId ?? null);
     setNewStatus(task.status);
+    setNewTaskFolder(task.folderId || null);
     setShowModal(true);
   };
 
@@ -341,7 +449,10 @@ useEffect(() => {
       return t;
     }));
   };
-  const setTaskStatus = (id: number, status: Status) => setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  
+  const setTaskStatus = (id: number, status: Status) => {
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+  };
 
   // custom category add
   const addCustomCategory = async (val: string) => {
@@ -379,25 +490,6 @@ useEffect(() => {
     setNewCategoryId(data.id);
   };
 
-  // invite
-  const addInvite = () => {
-    const email = inviteEmail.trim();
-    if (!email) return alert("Please enter an email");
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!re.test(email)) return alert("Please enter a valid email");
-    setInvites(prev => {
-      if (prev.includes(email)) {
-        alert("Already invited");
-        return prev;
-      }
-      alert(`Invite sent to ${email} (simulated)`);
-      return [email, ...prev];
-    });
-    setInviteEmail("");
-    setShowInviteModal(false);
-  };
-
-  // avatar upload
   const onAvatarUpload = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
@@ -408,11 +500,20 @@ useEffect(() => {
     reader.readAsDataURL(file);
   };
 
-  // filter + sort logic
+  // Filter tasks by folder
+  const tasksInView = useMemo(() => {
+    if (selectedFolder === null) {
+      return tasks;
+    }
+    return tasks.filter(t => t.folderId === selectedFolder);
+  }, [tasks, selectedFolder]);
+
+  // Apply search and filters
   const filteredSorted = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const today = new Date().toISOString().split("T")[0];
-    let result = tasks.filter(t => {
+    
+    let result = tasksInView.filter(t => {
       if (q) {
         const hay = `${t.text} ${t.description} ${t.category}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -442,19 +543,19 @@ useEffect(() => {
     });
 
     return result;
-  }, [tasks, searchQuery, categoryFilter, priorityFilter, dateFilter, sortBy]);
+  }, [tasksInView, searchQuery, categoryFilter, priorityFilter, dateFilter, sortBy]);
 
-  // stats
-  const total = tasks.length;
-  const completedCount = tasks.filter(t => t.done).length;
-  const inProgressCount = tasks.filter(t => !t.done && t.status === "in_progress").length;
-  const notStartedCount = tasks.filter(t => !t.done && t.status === "not_started").length;
+  // Stats
+  const total = tasksInView.length;
+  const completedCount = tasksInView.filter(t => t.done).length;
+  const inProgressCount = tasksInView.filter(t => !t.done && t.status === "in_progress").length;
+  const notStartedCount = tasksInView.filter(t => !t.done && t.status === "not_started").length;
 
   const overallPercent = total ? Math.round((completedCount / total) * 100) : 0;
   const inProgressPercent = total ? Math.round((inProgressCount / total) * 100) : 0;
   const notStartedPercent = total ? Math.round((notStartedCount / total) * 100) : 0;
 
-  // small circular progress component
+  // Progress component
   const CircleProgress: React.FC<{ percent: number; size?: number }> = ({ percent, size = 64 }) => {
     const r = (size / 2) - 6;
     const c = 2 * Math.PI * r;
@@ -517,7 +618,6 @@ useEffect(() => {
     return name.split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase();
   };
 
-  // inline small animations
   const inlineStyles = `
     @keyframes modalScaleIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
     .animate-modal-in { animation: modalScaleIn 220ms ease-out forwards; }
@@ -525,12 +625,12 @@ useEffect(() => {
     .animate-slide-in { animation: slideIn 260ms ease-out forwards; }
   `;
 
-  // UI color helpers
   const beePriorityColor = {
     Low: "bg-[#fff8c2] text-[#5a5000]",
     Medium: "bg-[#f5e99f] text-[#3a3200]",
     High: "bg-[#1a1a1a] text-[#fffbe6]"
   };
+
   const beeCategoryColor: Record<string, string> = {
     School: "bg-[#fff8c2] text-[#5a5000]",
     Work: "bg-[#f5e99f] text-[#3a3200]",
@@ -540,23 +640,22 @@ useEffect(() => {
     Other: "bg-[#ffeeb3] text-[#4a3f00]"
   };
 
-  // friendly UI helpers
   const focusSearch = () => { searchRef.current?.focus(); };
+
+  const activeFolderName = selectedFolder ? folders.find(f => f.id === selectedFolder)?.name || "Unknown" : "All Tasks";
 
   return (
     <main className={`min-h-screen bg-[#fafafa] p-6 relative text-[#1a1a1a] transition-all duration-300 ${sidebarOpen ? "ml-80" : "ml-0"}`}>
       <style>{inlineStyles}</style>
 
       {/* SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`} aria-hidden={!sidebarOpen}>
+      <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-2xl font-extrabold">Do Bee</h2>
-          </div>
+          <h2 className="text-2xl font-extrabold">Do Bee</h2>
           <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
         </div>
 
-        {/* Avatar + upload */}
+        {/* Avatar */}
         <div className="flex items-center gap-3 mb-4">
           <div className="relative">
             {avatarDataUrl ? (
@@ -580,51 +679,143 @@ useEffect(() => {
           </div>
         </div>
 
-        <nav className="space-y-3 animate-slide-in">
-          <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition" href="/dashboard">
+        {/* Navigation */}
+        <nav className="space-y-3 animate-slide-in mb-6">
+          <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow bg-[#ffd6e8] hover:bg-[#ffd6e8] transition" href="/dashboard">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
             <span className="font-medium">Dashboard</span>
           </a>
 
-          <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition" href="/statistics">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" /></svg>
+          {/* CALENDAR */}
+          <a
+            href="/calendar"
+            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" fill="#1a1a1a" />
+            </svg>
+            <span className="font-medium">Calendar</span>
+          </a>
+
+          {/* STATISTICS */}
+          <a
+            href="/statistics"
+            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" />
+            </svg>
             <span className="font-medium">Statistics</span>
           </a>
 
-          <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#ffd6e8] transition" href="/settings">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 003 9.11V8z" fill="#1a1a1a" /></svg>
+          {/* SETTINGS */}
+          <a
+            href="/settings"
+            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 003 9.11V8z"
+                fill="#1a1a1a"
+              />
+            </svg>
             <span className="font-medium">Settings</span>
           </a>
-
         </nav>
 
+        {/* Folders Section */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold">Folders</h4>
+            <button onClick={() => setShowCreateFolderModal(true)} className="text-xs bg-[#f5e99f] px-3 py-1 rounded-lg hover:bg-[#ffe680] transition">+ New</button>
+          </div>
 
-        <div className="mt-6">
-          <h4 className="text-sm font-medium mb-2">Invited</h4>
-          <ul className="text-xs text-gray-600 space-y-1 max-h-28 overflow-auto pr-2">
-            {invites.length === 0 && <li className="text-gray-400">No invites yet</li>}
-            {invites.map(i => <li key={i} className="flex items-center justify-between"><span>{i}</span></li>)}
-          </ul>
+          <button 
+            onClick={() => setSelectedFolder(null)}
+            className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition ${selectedFolder === null ? "bg-[#fff8d6] font-medium" : "hover:bg-white"}`}
+          >
+            📂 All Tasks ({tasks.length})
+          </button>
+
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            {folders.map(folder => {
+              const isOwner = folder.owner === userEmail;
+              const isCollaborator = folder.collaborators.includes(userEmail);
+              const taskCount = tasks.filter(t => t.folderId === folder.id).length;
+              
+              return (
+                <div key={folder.id} className={`group px-3 py-2 rounded-lg transition ${selectedFolder === folder.id ? "bg-[#fff8d6]" : "hover:bg-white"}`}>
+                  <div className="flex items-center justify-between">
+                    <button 
+                      onClick={() => setSelectedFolder(folder.id)}
+                      className="flex-1 text-left text-sm"
+                    >
+                      <span className="font-medium">{isOwner ? "📁" : "🤝"} {folder.name}</span>
+                      <span className="text-xs text-gray-500 ml-2">({taskCount})</span>
+                    </button>
+                    
+                    {isOwner && (
+                      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                        <button 
+                          onClick={() => { setActiveFolderForShare(folder.id); setShowShareFolderModal(true); }}
+                          className="p-1 rounded hover:bg-[#ffd6e8] text-xs"
+                          title="Share folder"
+                        >
+                          ➕
+                        </button>
+                        <button 
+                          onClick={() => deleteFolder(folder.id)}
+                          className="p-1 rounded hover:bg-red-100 text-xs"
+                          title="Delete folder"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {folder.collaborators.length > 0 && (
+                    <div className="mt-2 text-xs text-gray-500">
+                      <div className="font-medium mb-1">Shared with:</div>
+                      {folder.collaborators.map(email => (
+                        <div key={email} className="flex items-center justify-between py-1">
+                          <span>{email}</span>
+                          {isOwner && (
+                            <button 
+                              onClick={() => removeCollaborator(folder.id, email)}
+                              className="text-red-500 hover:text-red-700"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
-      {/* LOGOUT BUTTON */}
-<div className="absolute bottom-6 left-0 w-full px-6">
-  <button 
-    onClick={handleLogout} 
-    className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
-  >
-    Logout
-  </button>
-</div>
+
+        {/* Logout Button */}
+        <div className="mt-auto pt-6 border-t border-yellow-200">
+          <button 
+            onClick={handleLogout} 
+            className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
+          >
+            Logout
+          </button>
+        </div>
       </aside>
 
-
-      {/* TOPBAR */}
+      {/* MAIN CONTENT */}
       <div className="max-w-7xl mx-auto">
+        {/* Top Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>}
 
-            {/* friendly search UI */}
             <div className="relative">
               <div className="flex items-center bg-white rounded-3xl shadow-sm px-3 py-2 border border-transparent focus-within:ring-2 focus-within:ring-[#f5e99f] transition">
                 <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2"><path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
@@ -632,7 +823,7 @@ useEffect(() => {
                   ref={searchRef}
                   value={rawSearch}
                   onChange={(e) => setRawSearch(e.target.value)}
-                  placeholder="Search tasks, descriptions, categories..."
+                  placeholder="Search tasks..."
                   className="outline-none px-2 py-1 w-80 md:w-96 bg-transparent"
                 />
                 {rawSearch && <button onClick={() => { setRawSearch(""); focusSearch(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
@@ -643,37 +834,31 @@ useEffect(() => {
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-600 text-right">
               <div className="font-semibold">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
+              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}</div>
             </div>
 
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
-              {avatarDataUrl ? (
-                <Image
-                  src={avatarDataUrl}
-                  alt="User avatar"
-                  width={32}
-                  height={32}
-                  unoptimized
-                  className="w-8 h-8 rounded-full object-cover"
-                />
-              ) : (
-                <span className="font-semibold">{getInitials()}</span>
-              )}
+              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
             </div>
           </div>
         </div>
 
-        {/* Welcome */}
+        {/* Current Folder */}
         <div className="mb-4">
-          <h1 className="text-3xl font-bold">Your Tasks</h1>
+          <h1 className="text-3xl font-bold">{activeFolderName}</h1>
+          {selectedFolder && folders.find(f => f.id === selectedFolder) && (
+            <p className="text-sm text-gray-500 mt-1">
+              {folders.find(f => f.id === selectedFolder)?.owner === userEmail ? "You own this folder" : "Shared with you"}
+            </p>
+          )}
         </div>
 
-        {/* GRID */}
+        {/* Grid Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* LEFT: Task list area (span 2) */}
+          {/* Task List */}
           <div className="lg:col-span-2 space-y-6">
             {/* Controls */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white">
                   <option value="added">Sort by Added</option>
@@ -693,17 +878,9 @@ useEffect(() => {
                   <option value="Low">Low</option>
                 </select>
               </div>
-
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                Active:
-                {rawSearch && <span className="ml-2 px-2 py-1 text-xs rounded-full bg-[#fff3f8]">{`q: "${rawSearch}"`}</span>}
-                {categoryFilter !== "All" && <span className="ml-2 px-2 py-1 text-xs rounded-full bg-[#fff3f8]">{categoryFilter}</span>}
-                {priorityFilter !== "All" && <span className="ml-2 px-2 py-1 text-xs rounded-full bg-[#fff3f8]">{priorityFilter}</span>}
-                {dateFilter && <span className="ml-2 px-2 py-1 text-xs rounded-full bg-[#fff3f8]">{dateFilter === "today" ? "Today" : dateFilter}</span>}
-              </div>
             </div>
 
-            {/* Task list */}
+            {/* Task Cards */}
             <section className="bg-white p-4 rounded-3xl shadow-md border border-[#ffd6e8]/30">
               {filteredSorted.length === 0 ? (
                 <div className="py-12 text-center text-gray-400">No tasks — add one to get started.</div>
@@ -711,13 +888,11 @@ useEffect(() => {
                 <ul className="space-y-4">
                   {filteredSorted.map(task => (
                     <li key={task.id} className={`group flex gap-4 items-start p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`} style={{ background: task.done ? "#fffdf2" : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)", boxShadow: "0 8px 18px rgba(0,0,0,0.04)" }}>
-                      {/* left: checkbox + due */}
                       <div className="shrink-0 flex flex-col items-center pt-1">
                         <input type="checkbox" checked={task.done} onChange={() => toggleDone(task.id)} className="w-5 h-5 accent-[#f5e99f]" />
                         <div className="text-xs text-gray-400 mt-2">{task.due === "No date" ? "No due" : task.due}</div>
                       </div>
 
-                      {/* body */}
                       <div className="flex-1">
                         <div className="flex items-start justify-between">
                           <div>
@@ -731,7 +906,6 @@ useEffect(() => {
                           </div>
 
                           <div className="flex flex-col items-end gap-2">
-                            {/* status dropdown (hidden when done) */}
                             {!task.done ? (
                               <select value={task.status} onChange={(e) => setTaskStatus(task.id, e.target.value as Status)} className="border rounded-xl p-2 bg-white text-sm">
                                 <option value="not_started">Not Started</option>
@@ -745,8 +919,6 @@ useEffect(() => {
                               <button onClick={() => handleEdit(task)} className="p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition">Edit</button>
                               <button onClick={() => deleteTask(task.id)} className="p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition">Delete</button>
                             </div>
-
-                            <div className="text-xs text-gray-400">{new Date(task.created).toLocaleDateString()}</div>
                           </div>
                         </div>
                       </div>
@@ -757,7 +929,7 @@ useEffect(() => {
             </section>
           </div>
 
-          {/* RIGHT: Task Status + Invite */}
+          {/* Stats Panel */}
           <aside className="space-y-6">
             <section className="bg-white p-6 rounded-2xl shadow-md border border-[#f5e99f]/30">
               <div className="flex items-center justify-between">
@@ -800,19 +972,13 @@ useEffect(() => {
                 </div>
               </div>
             </section>
-
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#ffd6e8]/40 text-center">
-              <div className="text-sm font-semibold">Invite teammates</div>
-              <div className="text-xs text-gray-500 mt-1">Share your board and collaborate</div>
-              <button onClick={() => setShowInviteModal(true)} className="mt-3 px-4 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>+ Invite</button>
-            </div>
           </aside>
         </div>
 
-        {/* floating add button */}
+        {/* Floating Add Button */}
         <button onClick={() => { resetForm(); setShowModal(true); }} className="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#fffbe6] text-3xl rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:scale-105 transition-transform">➕</button>
 
-        {/* Add/Edit Modal */}
+        {/* Task Modal */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/40" onClick={() => { setShowModal(false); resetForm(); }} />
@@ -846,21 +1012,15 @@ useEffect(() => {
                   </select>
                 </div>
 
-                <div>
-                  <label className="text-xs text-gray-600">Initial Status</label>
-                  <select className="w-full border p-2 rounded-xl mt-1" value={newStatus} onChange={e => setNewStatus(e.target.value as Status)}>
-                    <option value="not_started">Not Started</option>
-                    <option value="in_progress">In Progress</option>
-                  </select>
-                </div>
+                <select className="w-full border p-2 rounded-xl" value={newTaskFolder || ""} onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">No Folder (All Tasks)</option>
+                  {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
 
-                <input type="text" placeholder="Add custom category and press Enter" className="w-full border p-2 rounded-xl" onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const val = (e.currentTarget as HTMLInputElement).value.trim();
-                    if (val) { addCustomCategory(val); (e.currentTarget as HTMLInputElement).value = ""; }
-                  }
-                }} />
+                <select className="w-full border p-2 rounded-xl" value={newStatus} onChange={e => setNewStatus(e.target.value as Status)}>
+                  <option value="not_started">Not Started</option>
+                  <option value="in_progress">In Progress</option>
+                </select>
 
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={() => { setShowModal(false); resetForm(); }} className="px-4 py-2 rounded-xl bg-gray-200">Cancel</button>
@@ -871,22 +1031,37 @@ useEffect(() => {
           </div>
         )}
 
-        {/* Invite Modal */}
-        {showInviteModal && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setShowInviteModal(false)} />
-            <div className="relative bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-[#ffd6e8]/40 animate-modal-in">
-              <h3 className="text-lg font-semibold mb-2">Invite Teammate</h3>
-              <p className="text-xs text-gray-500 mb-4">Enter an email to send an invite (simulated)</p>
-              <input value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="w-full border p-2 rounded-xl" placeholder="email@example.com" />
-              <div className="flex justify-end gap-2 mt-4">
-                <button onClick={() => setShowInviteModal(false)} className="px-4 py-2 rounded-xl bg-gray-200">Cancel</button>
-                <button onClick={addInvite} className="px-4 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>Send</button>
+        {/* Create Folder Modal */}
+        {showCreateFolderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowCreateFolderModal(false)} />
+            <div className="relative bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-[#f5e99f]/30 animate-modal-in">
+              <h3 className="text-lg font-semibold mb-2">Create Folder</h3>
+              <p className="text-xs text-gray-500 mb-4">Organize your tasks into folders</p>
+              <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} className="w-full border p-2 rounded-xl mb-4" placeholder="Folder name" />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setShowCreateFolderModal(false)} className="px-4 py-2 rounded-xl bg-gray-200">Cancel</button>
+                <button onClick={createFolder} className="px-4 py-2 rounded-xl" style={{ background: "#f5e99f" }}>Create</button>
               </div>
             </div>
           </div>
         )}
 
+        {/* Share Folder Modal */}
+        {showShareFolderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={() => { setShowShareFolderModal(false); setActiveFolderForShare(null); }} />
+            <div className="relative bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-[#ffd6e8]/40 animate-modal-in">
+              <h3 className="text-lg font-semibold mb-2">Share Folder</h3>
+              <p className="text-xs text-gray-500 mb-4">Invite someone to collaborate on this folder</p>
+              <input value={shareEmail} onChange={(e) => setShareEmail(e.target.value)} className="w-full border p-2 rounded-xl" placeholder="email@example.com" />
+              <div className="flex justify-end gap-2 mt-4">
+                <button onClick={() => { setShowShareFolderModal(false); setActiveFolderForShare(null); }} className="px-4 py-2 rounded-xl bg-gray-200">Cancel</button>
+                <button onClick={shareFolder} className="px-4 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>Share</button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

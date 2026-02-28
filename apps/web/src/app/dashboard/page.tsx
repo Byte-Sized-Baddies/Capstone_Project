@@ -5,7 +5,6 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
-
 type Status = "not_started" | "in_progress";
 type Priority = "Low" | "Medium" | "High";
 type PriorityFilter = "All" | Priority;
@@ -46,7 +45,11 @@ const LIGHT_PINK = "#ffd6e8";
 
 export default function DashboardPage() {
   const router = useRouter();
-  
+
+  // Auth state
+  const [authReady, setAuthReady] = useState(false);
+  const loadedForUser = useRef<string | null>(null);
+
   // User state
   const [userEmail, setUserEmail] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("User");
@@ -93,7 +96,7 @@ export default function DashboardPage() {
 
   const searchRef = useRef<HTMLInputElement | null>(null);
 
-  // Session Check
+  // ─── Session Check ────────────────────────────────────────────────────────
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -102,9 +105,31 @@ export default function DashboardPage() {
         return;
       }
       const user = data.session.user;
+
+      // If a DIFFERENT user is now logged in, wipe the previous user's cache
+      const cachedEmail = localStorage.getItem("userEmail");
+      if (cachedEmail && cachedEmail !== user.email) {
+        localStorage.removeItem("tasks");
+        localStorage.removeItem("folders");
+        localStorage.removeItem("categories");
+        localStorage.removeItem("avatar");
+        localStorage.removeItem("displayName");
+        // Reset in-memory state too
+        setTasks([]);
+        setFolders([]);
+        setCustomCategories([]);
+        setAvatarDataUrl(null);
+      }
+      localStorage.setItem("userEmail", user.email ?? "");
+
       setUserEmail(user.email || "");
-      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
+      const name =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.name ||
+        user.email?.split("@")[0] ||
+        "User";
       setDisplayName(name);
+      setAuthReady(true); // ✅ signal auth is resolved
     };
 
     const { data: authListener } = supabase.auth.onAuthStateChange(() => {
@@ -118,7 +143,7 @@ export default function DashboardPage() {
     };
   }, [router]);
 
-  // Logout
+  // ─── Logout ───────────────────────────────────────────────────────────────
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("tasks");
@@ -126,23 +151,26 @@ export default function DashboardPage() {
     localStorage.removeItem("categories");
     localStorage.removeItem("avatar");
     localStorage.removeItem("displayName");
+    localStorage.removeItem("userEmail");
     router.push("/login");
   };
 
-  // Debounce search
+  // ─── Debounce search ──────────────────────────────────────────────────────
   useEffect(() => {
     const t = setTimeout(() => setSearchQuery(rawSearch.trim()), 280);
     return () => clearTimeout(t);
   }, [rawSearch]);
 
-  // Load saved state
+  // ─── Load saved state (only after auth is confirmed) ─────────────────────
   useEffect(() => {
+    if (!authReady) return; // ✅ gate: do NOT load until we know who the user is
+
     const saved = localStorage.getItem("tasks");
     const savedFolders = localStorage.getItem("folders");
     const savedCat = localStorage.getItem("categories");
     const savedAvatar = localStorage.getItem("avatar");
     const savedName = localStorage.getItem("displayName");
-    
+
     if (saved) {
       try { setTasks(JSON.parse(saved)); } catch { setTasks([]); }
     }
@@ -163,12 +191,12 @@ export default function DashboardPage() {
     setPriorityFilter(priorityOptions.includes(pr as Priority) ? (pr as Priority) : "All");
     setDateFilter(params.get("d") ?? "");
     setSortBy(params.get("s") ?? "added");
+  }, [authReady]); // ✅ depend on authReady
 
-
-  }, []);
-
-  // load categories + tasks from Supabase
+  // ─── Load categories + tasks from Supabase ────────────────────────────────
   useEffect(() => {
+    if (!authReady) return;
+
     const loadCategoriesAndTasks = async () => {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData.user;
@@ -198,7 +226,9 @@ export default function DashboardPage() {
 
       if (!taskError && taskRows) {
         const mapped: Task[] = taskRows.map((row) => {
-          const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
+          const categoryName = row.category_id
+            ? categoryMap.get(row.category_id) ?? "Uncategorized"
+            : "Uncategorized";
           return {
             id: row.id,
             text: row.title,
@@ -217,85 +247,73 @@ export default function DashboardPage() {
     };
 
     loadCategoriesAndTasks();
-  }, [newCategoryId]);
+  }, [authReady, newCategoryId]);
 
-
-  // Persist state
+  // ─── Persist state ────────────────────────────────────────────────────────
   useEffect(() => localStorage.setItem("tasks", JSON.stringify(tasks)), [tasks]);
   useEffect(() => localStorage.setItem("folders", JSON.stringify(folders)), [folders]);
   useEffect(() => localStorage.setItem("categories", JSON.stringify(customCategories)), [customCategories]);
   useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
 
-  // Sync filters to URL
+  // ─── Sync filters to URL ──────────────────────────────────────────────────
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (rawSearch) params.set("q", rawSearch);
-    else params.delete("q");
-    if (categoryFilter && categoryFilter !== "All") params.set("cat", categoryFilter);
-    else params.delete("cat");
-    if (priorityFilter && priorityFilter !== "All") params.set("p", priorityFilter);
-    else params.delete("p");
-    if (dateFilter) params.set("d", dateFilter);
-    else params.delete("d");
-    if (sortBy) params.set("s", sortBy);
-    else params.delete("s");
+    if (rawSearch) params.set("q", rawSearch); else params.delete("q");
+    if (categoryFilter && categoryFilter !== "All") params.set("cat", categoryFilter); else params.delete("cat");
+    if (priorityFilter && priorityFilter !== "All") params.set("p", priorityFilter); else params.delete("p");
+    if (dateFilter) params.set("d", dateFilter); else params.delete("d");
+    if (sortBy) params.set("s", sortBy); else params.delete("s");
     const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}`;
     window.history.replaceState({}, "", newUrl);
   }, [rawSearch, categoryFilter, priorityFilter, dateFilter, sortBy]);
 
-  // Folder management
+  // ─── Folder management ────────────────────────────────────────────────────
   const createFolder = () => {
     const name = newFolderName.trim();
     if (!name) return alert("Please enter a folder name");
-    
+
     const folder: Folder = {
       id: Date.now(),
       name,
       owner: userEmail,
       collaborators: [],
-      created: Date.now()
+      created: Date.now(),
     };
-    
-    setFolders(prev => [folder, ...prev]);
+
+    setFolders((prev) => [folder, ...prev]);
     setNewFolderName("");
     setShowCreateFolderModal(false);
   };
 
   const deleteFolder = (folderId: number) => {
     if (!confirm("Delete this folder? Tasks will be moved to 'All Tasks'.")) return;
-    
-    // Move tasks out of folder
-    setTasks(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: null } : t));
-    setFolders(prev => prev.filter(f => f.id !== folderId));
-    
-    if (selectedFolder === folderId) {
-      setSelectedFolder(null);
-    }
+    setTasks((prev) => prev.map((t) => (t.folderId === folderId ? { ...t, folderId: null } : t)));
+    setFolders((prev) => prev.filter((f) => f.id !== folderId));
+    if (selectedFolder === folderId) setSelectedFolder(null);
   };
 
   const shareFolder = () => {
     const email = shareEmail.trim().toLowerCase();
     if (!email) return alert("Please enter an email");
     if (!activeFolderForShare) return;
-    
     const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!re.test(email)) return alert("Please enter a valid email");
-    
     if (email === userEmail) return alert("You can't share with yourself");
-    
-    setFolders(prev => prev.map(f => {
-      if (f.id === activeFolderForShare) {
-        if (f.collaborators.includes(email)) {
-          alert("Already shared with this user");
-          return f;
+
+    setFolders((prev) =>
+      prev.map((f) => {
+        if (f.id === activeFolderForShare) {
+          if (f.collaborators.includes(email)) {
+            alert("Already shared with this user");
+            return f;
+          }
+          alert(`Folder shared with ${email}`);
+          return { ...f, collaborators: [...f.collaborators, email] };
         }
-        alert(`Folder shared with ${email}`);
-        return { ...f, collaborators: [...f.collaborators, email] };
-      }
-      return f;
-    }));
-    
+        return f;
+      })
+    );
     setShareEmail("");
     setShowShareFolderModal(false);
     setActiveFolderForShare(null);
@@ -303,20 +321,17 @@ export default function DashboardPage() {
 
   const removeCollaborator = (folderId: number, email: string) => {
     if (!confirm(`Remove ${email} from this folder?`)) return;
-    
-    setFolders(prev => prev.map(f => {
-      if (f.id === folderId) {
-        return { ...f, collaborators: f.collaborators.filter(c => c !== email) };
-      }
-      return f;
-    }));
+    setFolders((prev) =>
+      prev.map((f) =>
+        f.id === folderId ? { ...f, collaborators: f.collaborators.filter((c) => c !== email) } : f
+      )
+    );
   };
 
-  const canEditFolder = (folder: Folder) => {
-    return folder.owner === userEmail || folder.collaborators.includes(userEmail);
-  };
+  const canEditFolder = (folder: Folder) =>
+    folder.owner === userEmail || folder.collaborators.includes(userEmail);
 
-  // Task management
+  // ─── Task management ──────────────────────────────────────────────────────
   const resetForm = () => {
     setNewTask("");
     setNewDescription("");
@@ -330,7 +345,6 @@ export default function DashboardPage() {
     setEditId(null);
   };
 
-  // add/edit
   const handleAddOrEdit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!newTask.trim()) return;
@@ -352,22 +366,23 @@ export default function DashboardPage() {
     };
 
     if (editId !== null) {
-      await supabase
-        .from("tasks_v2")
-        .update(payload)
-        .eq("id", editId)
-        .eq("user_id", user.id);
-
-      setTasks(prev => prev.map(t => t.id === editId ? {
-        ...t,
-        text: payload.title,
-        description: payload.description ?? "",
-        due: payload.due_date ?? "No date",
-        priority: newPriority,
-        category: newCategory,
-        categoryId: newCategoryId,
-        status: newStatus
-      } : t));
+      await supabase.from("tasks_v2").update(payload).eq("id", editId).eq("user_id", user.id);
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === editId
+            ? {
+                ...t,
+                text: payload.title,
+                description: payload.description ?? "",
+                due: payload.due_date ?? "No date",
+                priority: newPriority,
+                category: newCategory,
+                categoryId: newCategoryId,
+                status: newStatus,
+              }
+            : t
+        )
+      );
       setEditId(null);
     } else {
       const { data, error } = await supabase
@@ -388,9 +403,9 @@ export default function DashboardPage() {
           priority: newPriority,
           category: newCategory,
           categoryId: newCategoryId,
-          folderId: newTaskFolder
+          folderId: newTaskFolder,
         };
-        setTasks(prev => [t, ...prev]);
+        setTasks((prev) => [t, ...prev]);
       }
     }
     resetForm();
@@ -414,47 +429,35 @@ export default function DashboardPage() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
     if (!user) return;
-
-    await supabase
-      .from("tasks_v2")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    setTasks(prev => prev.filter(t => t.id !== id));
+    await supabase.from("tasks_v2").delete().eq("id", id).eq("user_id", user.id);
+    setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
   const toggleDone = async (id: number) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
-
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
     if (!user) return;
-
     const nextDone = !task.done;
-    await supabase
-      .from("tasks_v2")
-      .update({ is_completed: nextDone })
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    setTasks(prev => prev.map(t => {
-      if (t.id === id) {
-        const updated = { ...t, done: nextDone };
-        // send notification on completion
-        if (!t.done && updated.done) sendNotification(`Task Completed`, `${t.text}`);
-        return updated;
-      }
-      return t;
-    }));
+    await supabase.from("tasks_v2").update({ is_completed: nextDone }).eq("id", id).eq("user_id", user.id);
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id === id) {
+          const updated = { ...t, done: nextDone };
+          if (!t.done && updated.done) sendNotification(`Task Completed`, `${t.text}`);
+          return updated;
+        }
+        return t;
+      })
+    );
   };
-  
+
   const setTaskStatus = (id: number, status: Status) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
   };
 
-  // custom category add
+  // ─── Custom category add ──────────────────────────────────────────────────
   const addCustomCategory = async (val: string) => {
     const v = val.trim();
     if (!v) return;
@@ -468,10 +471,7 @@ export default function DashboardPage() {
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (userError || !user) {
-      alert("You must be logged in to create a category.");
-      return;
-    }
+    if (userError || !user) { alert("You must be logged in to create a category."); return; }
 
     const { data, error } = await supabase
       .from("categories_v2")
@@ -500,20 +500,17 @@ export default function DashboardPage() {
     reader.readAsDataURL(file);
   };
 
-  // Filter tasks by folder
+  // ─── Filtered/sorted tasks ────────────────────────────────────────────────
   const tasksInView = useMemo(() => {
-    if (selectedFolder === null) {
-      return tasks;
-    }
-    return tasks.filter(t => t.folderId === selectedFolder);
+    if (selectedFolder === null) return tasks;
+    return tasks.filter((t) => t.folderId === selectedFolder);
   }, [tasks, selectedFolder]);
 
-  // Apply search and filters
   const filteredSorted = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const today = new Date().toISOString().split("T")[0];
-    
-    let result = tasksInView.filter(t => {
+
+    let result = tasksInView.filter((t) => {
       if (q) {
         const hay = `${t.text} ${t.description} ${t.category}`.toLowerCase();
         if (!hay.includes(q)) return false;
@@ -521,11 +518,8 @@ export default function DashboardPage() {
       if (categoryFilter !== "All" && t.category !== categoryFilter) return false;
       if (priorityFilter !== "All" && t.priority !== priorityFilter) return false;
       if (dateFilter) {
-        if (dateFilter === "today") {
-          if (t.due !== today) return false;
-        } else {
-          if (t.due !== dateFilter) return false;
-        }
+        if (dateFilter === "today") { if (t.due !== today) return false; }
+        else { if (t.due !== dateFilter) return false; }
       }
       return true;
     });
@@ -545,19 +539,19 @@ export default function DashboardPage() {
     return result;
   }, [tasksInView, searchQuery, categoryFilter, priorityFilter, dateFilter, sortBy]);
 
-  // Stats
+  // ─── Stats ────────────────────────────────────────────────────────────────
   const total = tasksInView.length;
-  const completedCount = tasksInView.filter(t => t.done).length;
-  const inProgressCount = tasksInView.filter(t => !t.done && t.status === "in_progress").length;
-  const notStartedCount = tasksInView.filter(t => !t.done && t.status === "not_started").length;
+  const completedCount = tasksInView.filter((t) => t.done).length;
+  const inProgressCount = tasksInView.filter((t) => !t.done && t.status === "in_progress").length;
+  const notStartedCount = tasksInView.filter((t) => !t.done && t.status === "not_started").length;
 
   const overallPercent = total ? Math.round((completedCount / total) * 100) : 0;
   const inProgressPercent = total ? Math.round((inProgressCount / total) * 100) : 0;
   const notStartedPercent = total ? Math.round((notStartedCount / total) * 100) : 0;
 
-  // Progress component
+  // ─── Progress circle ──────────────────────────────────────────────────────
   const CircleProgress: React.FC<{ percent: number; size?: number }> = ({ percent, size = 64 }) => {
-    const r = (size / 2) - 6;
+    const r = size / 2 - 6;
     const c = 2 * Math.PI * r;
     const dash = (percent / 100) * c;
     return (
@@ -568,55 +562,51 @@ export default function DashboardPage() {
             <stop offset="100%" stopColor="#FFD36E" />
           </linearGradient>
         </defs>
-        <g transform={`translate(${size/2},${size/2})`}>
+        <g transform={`translate(${size / 2},${size / 2})`}>
           <circle r={r} cx={0} cy={0} fill="transparent" stroke="#fff3c4" strokeWidth="8" />
           <circle r={r} cx={0} cy={0} fill="transparent" stroke="url(#gp2)" strokeWidth="8"
             strokeDasharray={`${dash} ${c - dash}`} strokeLinecap="round" transform="rotate(-90)" />
-          <text x="0" y="4" textAnchor="middle" fontSize={size/5} fontWeight={700} fill="#1a1a1a">{percent}%</text>
+          <text x="0" y="4" textAnchor="middle" fontSize={size / 5} fontWeight={700} fill="#1a1a1a">{percent}%</text>
         </g>
       </svg>
     );
   };
 
-  // notifications helpers
+  // ─── Notifications ────────────────────────────────────────────────────────
   const sendNotification = useCallback((title: string, body?: string) => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
-    try {
-      new Notification(title, { body });
-    } catch {
-      // ignore
-    }
+    try { new Notification(title, { body }); } catch { /* ignore */ }
   }, []);
 
   const sendDueTodayNotifications = useCallback(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
     const today = new Date().toISOString().split("T")[0];
-    const dueToday = tasks.filter(t => t.due === today && !t.done);
+    const dueToday = tasks.filter((t) => t.due === today && !t.done);
     dueToday.forEach((t, i) => {
       setTimeout(() => sendNotification("Due Today", `${t.text} is due today`), i * 400);
     });
   }, [sendNotification, tasks]);
 
-  // request notification permission on first open (if default)
   useEffect(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission === "default") {
-      // prompt once
-      Notification.requestPermission().then(() => {
-        // after permission choose, if granted send due-today notifications
-        sendDueTodayNotifications();
-      }).catch(() => {});
+      Notification.requestPermission().then(() => { sendDueTodayNotifications(); }).catch(() => {});
     } else if (Notification.permission === "granted") {
       sendDueTodayNotifications();
     }
   }, [sendDueTodayNotifications]);
 
-  // avatar initial fallback
-  const getInitials = (name = displayName) => {
-    return name.split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase();
-  };
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+  const getInitials = (name = displayName) =>
+    name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
+
+  const focusSearch = () => { searchRef.current?.focus(); };
+
+  const activeFolderName = selectedFolder
+    ? folders.find((f) => f.id === selectedFolder)?.name || "Unknown"
+    : "All Tasks";
 
   const inlineStyles = `
     @keyframes modalScaleIn { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
@@ -628,7 +618,7 @@ export default function DashboardPage() {
   const beePriorityColor = {
     Low: "bg-[#fff8c2] text-[#5a5000]",
     Medium: "bg-[#f5e99f] text-[#3a3200]",
-    High: "bg-[#1a1a1a] text-[#fffbe6]"
+    High: "bg-[#1a1a1a] text-[#fffbe6]",
   };
 
   const beeCategoryColor: Record<string, string> = {
@@ -637,22 +627,44 @@ export default function DashboardPage() {
     Personal: "bg-[#ffe680] text-[#4a3f00]",
     Chores: "bg-[#fff4a6] text-[#4a3f00]",
     Fitness: "bg-[#ffec70] text-[#4a3f00]",
-    Other: "bg-[#ffeeb3] text-[#4a3f00]"
+    Other: "bg-[#ffeeb3] text-[#4a3f00]",
   };
 
-  const focusSearch = () => { searchRef.current?.focus(); };
+  // ─── Loading screen (shown until auth resolves) ───────────────────────────
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-5xl mb-4">🐝</div>
+          <div className="text-gray-500 text-sm font-medium">Loading your tasks...</div>
+        </div>
+      </div>
+    );
+  }
 
-  const activeFolderName = selectedFolder ? folders.find(f => f.id === selectedFolder)?.name || "Unknown" : "All Tasks";
-
+  // ─── Render ───────────────────────────────────────────────────────────────
   return (
-    <main className={`min-h-screen bg-[#fafafa] p-6 relative text-[#1a1a1a] transition-all duration-300 ${sidebarOpen ? "ml-80" : "ml-0"}`}>
+    <main
+      className={`min-h-screen bg-[#fafafa] p-6 relative text-[#1a1a1a] transition-all duration-300 ${
+        sidebarOpen ? "ml-80" : "ml-0"
+      }`}
+    >
       <style>{inlineStyles}</style>
 
       {/* SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-extrabold">Do Bee</h2>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition"
+          >
+            ✕
+          </button>
         </div>
 
         {/* Avatar */}
@@ -668,54 +680,64 @@ export default function DashboardPage() {
                 className="w-14 h-14 rounded-full object-cover shadow"
               />
             ) : (
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">{getInitials()}</div>
+              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">
+                {getInitials()}
+              </div>
             )}
-            <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full border shadow cursor-pointer text-xs">✎</label>
-            <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
+            <label
+              htmlFor="avatar-upload"
+              className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full border shadow cursor-pointer text-xs"
+            >
+              ✎
+            </label>
+            <input
+              id="avatar-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }}
+            />
           </div>
           <div>
             <div className="text-sm font-medium">{displayName}</div>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="text-xs mt-1 border rounded px-2 py-1" />
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="text-xs mt-1 border rounded px-2 py-1"
+            />
           </div>
         </div>
 
         {/* Navigation */}
         <nav className="space-y-3 animate-slide-in mb-6">
-          <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow bg-[#ffd6e8] hover:bg-[#ffd6e8] transition" href="/dashboard">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
+          <a
+            className="flex items-center gap-3 bg-[#ffd6e8] px-4 py-3 rounded-xl shadow hover:bg-[#ffd6e8] transition"
+            href="/dashboard"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" />
+            </svg>
             <span className="font-medium">Dashboard</span>
           </a>
 
-          {/* CALENDAR */}
-          <a
-            href="/calendar"
-            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
-          >
+          <a href="/calendar" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" fill="#1a1a1a" />
             </svg>
             <span className="font-medium">Calendar</span>
           </a>
 
-          {/* STATISTICS */}
-          <a
-            href="/statistics"
-            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
-          >
+          <a href="/statistics" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" />
             </svg>
             <span className="font-medium">Statistics</span>
           </a>
 
-          {/* SETTINGS */}
-          <a
-            href="/settings"
-            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
-          >
+          <a href="/settings" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
-                d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 003 9.11V8z"
+                d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 013 9.11V8z"
                 fill="#1a1a1a"
               />
             </svg>
@@ -727,43 +749,49 @@ export default function DashboardPage() {
         <div className="mb-6">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Folders</h4>
-            <button onClick={() => setShowCreateFolderModal(true)} className="text-xs bg-[#f5e99f] px-3 py-1 rounded-lg hover:bg-[#ffe680] transition">+ New</button>
+            <button
+              onClick={() => setShowCreateFolderModal(true)}
+              className="text-xs bg-[#f5e99f] px-3 py-1 rounded-lg hover:bg-[#ffe680] transition"
+            >
+              + New
+            </button>
           </div>
 
-          <button 
+          <button
             onClick={() => setSelectedFolder(null)}
-            className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition ${selectedFolder === null ? "bg-[#fff8d6] font-medium" : "hover:bg-white"}`}
+            className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition ${
+              selectedFolder === null ? "bg-[#fff8d6] font-medium" : "hover:bg-white"
+            }`}
           >
             📂 All Tasks ({tasks.length})
           </button>
 
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {folders.map(folder => {
+            {folders.map((folder) => {
               const isOwner = folder.owner === userEmail;
-              const isCollaborator = folder.collaborators.includes(userEmail);
-              const taskCount = tasks.filter(t => t.folderId === folder.id).length;
-              
+              const taskCount = tasks.filter((t) => t.folderId === folder.id).length;
               return (
-                <div key={folder.id} className={`group px-3 py-2 rounded-lg transition ${selectedFolder === folder.id ? "bg-[#fff8d6]" : "hover:bg-white"}`}>
+                <div
+                  key={folder.id}
+                  className={`group px-3 py-2 rounded-lg transition ${
+                    selectedFolder === folder.id ? "bg-[#fff8d6]" : "hover:bg-white"
+                  }`}
+                >
                   <div className="flex items-center justify-between">
-                    <button 
-                      onClick={() => setSelectedFolder(folder.id)}
-                      className="flex-1 text-left text-sm"
-                    >
+                    <button onClick={() => setSelectedFolder(folder.id)} className="flex-1 text-left text-sm">
                       <span className="font-medium">{isOwner ? "📁" : "🤝"} {folder.name}</span>
                       <span className="text-xs text-gray-500 ml-2">({taskCount})</span>
                     </button>
-                    
                     {isOwner && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                        <button 
+                        <button
                           onClick={() => { setActiveFolderForShare(folder.id); setShowShareFolderModal(true); }}
                           className="p-1 rounded hover:bg-[#ffd6e8] text-xs"
                           title="Share folder"
                         >
                           ➕
                         </button>
-                        <button 
+                        <button
                           onClick={() => deleteFolder(folder.id)}
                           className="p-1 rounded hover:bg-red-100 text-xs"
                           title="Delete folder"
@@ -773,20 +801,14 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </div>
-                  
                   {folder.collaborators.length > 0 && (
                     <div className="mt-2 text-xs text-gray-500">
                       <div className="font-medium mb-1">Shared with:</div>
-                      {folder.collaborators.map(email => (
+                      {folder.collaborators.map((email) => (
                         <div key={email} className="flex items-center justify-between py-1">
                           <span>{email}</span>
                           {isOwner && (
-                            <button 
-                              onClick={() => removeCollaborator(folder.id, email)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              ✕
-                            </button>
+                            <button onClick={() => removeCollaborator(folder.id, email)} className="text-red-500 hover:text-red-700">✕</button>
                           )}
                         </div>
                       ))}
@@ -798,10 +820,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Logout Button */}
+        {/* Logout */}
         <div className="mt-auto pt-6 border-t border-yellow-200">
-          <button 
-            onClick={handleLogout} 
+          <button
+            onClick={handleLogout}
             className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
           >
             Logout
@@ -814,11 +836,19 @@ export default function DashboardPage() {
         {/* Top Bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
-            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>}
-
+            {!sidebarOpen && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition"
+              >
+                ☰
+              </button>
+            )}
             <div className="relative">
               <div className="flex items-center bg-white rounded-3xl shadow-sm px-3 py-2 border border-transparent focus-within:ring-2 focus-within:ring-[#f5e99f] transition">
-                <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2"><path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
+                <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2">
+                  <path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                </svg>
                 <input
                   ref={searchRef}
                   value={rawSearch}
@@ -826,7 +856,11 @@ export default function DashboardPage() {
                   placeholder="Search tasks..."
                   className="outline-none px-2 py-1 w-80 md:w-96 bg-transparent"
                 />
-                {rawSearch && <button onClick={() => { setRawSearch(""); focusSearch(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
+                {rawSearch && (
+                  <button onClick={() => { setRawSearch(""); focusSearch(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">
+                    Clear
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -834,11 +868,16 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             <div className="text-sm text-gray-600 text-right">
               <div className="font-semibold">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}</div>
+              <div className="text-xs">
+                {new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}
+              </div>
             </div>
-
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
-              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
+              {avatarDataUrl ? (
+                <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" />
+              ) : (
+                <span className="font-semibold">{getInitials()}</span>
+              )}
             </div>
           </div>
         </div>
@@ -846,9 +885,11 @@ export default function DashboardPage() {
         {/* Current Folder */}
         <div className="mb-4">
           <h1 className="text-3xl font-bold">{activeFolderName}</h1>
-          {selectedFolder && folders.find(f => f.id === selectedFolder) && (
+          {selectedFolder && folders.find((f) => f.id === selectedFolder) && (
             <p className="text-sm text-gray-500 mt-1">
-              {folders.find(f => f.id === selectedFolder)?.owner === userEmail ? "You own this folder" : "Shared with you"}
+              {folders.find((f) => f.id === selectedFolder)?.owner === userEmail
+                ? "You own this folder"
+                : "Shared with you"}
             </p>
           )}
         </div>
@@ -860,18 +901,30 @@ export default function DashboardPage() {
             {/* Controls */}
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white">
+                <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white">
                   <option value="added">Sort by Added</option>
                   <option value="due">Sort by Due Date</option>
                   <option value="alpha">Sort by A–Z</option>
                   <option value="category">Sort by Category</option>
                 </select>
 
-                <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }} className={`px-3 py-2 rounded-xl border ${dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"}`}>
+                <button
+                  onClick={() => {
+                    const today = new Date().toISOString().split("T")[0];
+                    setDateFilter((prev) => (prev === today ? "" : today));
+                  }}
+                  className={`px-3 py-2 rounded-xl border ${
+                    dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"
+                  }`}
+                >
                   Today&apos;s Tasks
                 </button>
 
-                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as PriorityFilter)} className="border rounded-xl p-2 bg-white">
+                <select
+                  value={priorityFilter}
+                  onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
+                  className="border rounded-xl p-2 bg-white"
+                >
                   <option value="All">Priority: All</option>
                   <option value="High">High</option>
                   <option value="Medium">Medium</option>
@@ -886,35 +939,63 @@ export default function DashboardPage() {
                 <div className="py-12 text-center text-gray-400">No tasks — add one to get started.</div>
               ) : (
                 <ul className="space-y-4">
-                  {filteredSorted.map(task => (
-                    <li key={task.id} className={`group flex gap-4 items-start p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`} style={{ background: task.done ? "#fffdf2" : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)", boxShadow: "0 8px 18px rgba(0,0,0,0.04)" }}>
+                  {filteredSorted.map((task) => (
+                    <li
+                      key={task.id}
+                      className={`group flex gap-4 items-start p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`}
+                      style={{
+                        background: task.done
+                          ? "#fffdf2"
+                          : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)",
+                        boxShadow: "0 8px 18px rgba(0,0,0,0.04)",
+                      }}
+                    >
                       <div className="shrink-0 flex flex-col items-center pt-1">
-                        <input type="checkbox" checked={task.done} onChange={() => toggleDone(task.id)} className="w-5 h-5 accent-[#f5e99f]" />
-                        <div className="text-xs text-gray-400 mt-2">{task.due === "No date" ? "No due" : task.due}</div>
+                        <input
+                          type="checkbox"
+                          checked={task.done}
+                          onChange={() => toggleDone(task.id)}
+                          className="w-5 h-5 accent-[#f5e99f]"
+                        />
+                        <div className="text-xs text-gray-400 mt-2">
+                          {task.due === "No date" ? "No due" : task.due}
+                        </div>
                       </div>
 
                       <div className="flex-1">
                         <div className="flex items-start justify-between">
                           <div>
-                            <h3 className={`font-semibold text-lg ${task.done ? "line-through text-gray-500" : ""}`}>{task.text}</h3>
+                            <h3 className={`font-semibold text-lg ${task.done ? "line-through text-gray-500" : ""}`}>
+                              {task.text}
+                            </h3>
                             <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-
                             <div className="flex items-center gap-2 mt-3">
-                              <span className={`px-2 py-1 rounded-full text-xs ${beePriorityColor[task.priority]}`}>{task.priority}</span>
-                              <span className={`px-2 py-1 rounded-full text-xs ${beeCategoryColor[task.category] ?? "bg-[#ffeeb3] text-[#4a3f00]"}`}>{task.category}</span>
+                              <span className={`px-2 py-1 rounded-full text-xs ${beePriorityColor[task.priority]}`}>
+                                {task.priority}
+                              </span>
+                              <span
+                                className={`px-2 py-1 rounded-full text-xs ${
+                                  beeCategoryColor[task.category] ?? "bg-[#ffeeb3] text-[#4a3f00]"
+                                }`}
+                              >
+                                {task.category}
+                              </span>
                             </div>
                           </div>
 
                           <div className="flex flex-col items-end gap-2">
                             {!task.done ? (
-                              <select value={task.status} onChange={(e) => setTaskStatus(task.id, e.target.value as Status)} className="border rounded-xl p-2 bg-white text-sm">
+                              <select
+                                value={task.status}
+                                onChange={(e) => setTaskStatus(task.id, e.target.value as Status)}
+                                className="border rounded-xl p-2 bg-white text-sm"
+                              >
                                 <option value="not_started">Not Started</option>
                                 <option value="in_progress">In Progress</option>
                               </select>
                             ) : (
                               <div className="text-xs text-gray-500">Completed</div>
                             )}
-
                             <div className="flex items-center gap-2 mt-2">
                               <button onClick={() => handleEdit(task)} className="p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition">Edit</button>
                               <button onClick={() => deleteTask(task.id)} className="p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition">Delete</button>
@@ -936,7 +1017,6 @@ export default function DashboardPage() {
                 <h3 className="font-semibold">Task Status</h3>
                 <div className="text-xs text-gray-500">Overview</div>
               </div>
-
               <div className="mt-4 grid grid-cols-1 gap-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -948,7 +1028,6 @@ export default function DashboardPage() {
                   </div>
                   <CircleProgress percent={overallPercent} size={64} />
                 </div>
-
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#f5e99f] text-[#3a3200] font-semibold">P</div>
@@ -959,7 +1038,6 @@ export default function DashboardPage() {
                   </div>
                   <CircleProgress percent={inProgressPercent} size={64} />
                 </div>
-
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 flex items-center justify-center rounded-full bg-white text-[#d94b4b] font-semibold border">N</div>
@@ -976,7 +1054,12 @@ export default function DashboardPage() {
         </div>
 
         {/* Floating Add Button */}
-        <button onClick={() => { resetForm(); setShowModal(true); }} className="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#fffbe6] text-3xl rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:scale-105 transition-transform">➕</button>
+        <button
+          onClick={() => { resetForm(); setShowModal(true); }}
+          className="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#fffbe6] text-3xl rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:scale-105 transition-transform"
+        >
+          ➕
+        </button>
 
         {/* Task Modal */}
         {showModal && (
@@ -985,12 +1068,12 @@ export default function DashboardPage() {
             <div className="relative bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-[#f5e99f]/30 animate-modal-in">
               <h2 className="text-lg font-semibold mb-3">{editId ? "Edit Task" : "Add Task"}</h2>
               <form onSubmit={(e) => { e.preventDefault(); handleAddOrEdit(); }} className="space-y-3">
-                <input className="w-full border p-2 rounded-xl" value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Task name" />
-                <textarea className="w-full border p-2 rounded-xl" value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="Description" />
-                <input type="date" className="w-full border p-2 rounded-xl" value={newDue} onChange={e => setNewDue(e.target.value)} />
+                <input className="w-full border p-2 rounded-xl" value={newTask} onChange={(e) => setNewTask(e.target.value)} placeholder="Task name" />
+                <textarea className="w-full border p-2 rounded-xl" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description" />
+                <input type="date" className="w-full border p-2 rounded-xl" value={newDue} onChange={(e) => setNewDue(e.target.value)} />
 
                 <div className="grid grid-cols-2 gap-3">
-                  <select className="w-full border p-2 rounded-xl" value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}>
+                  <select className="w-full border p-2 rounded-xl" value={newPriority} onChange={(e) => setNewPriority(e.target.value as Priority)}>
                     <option value="Low">Low Priority</option>
                     <option value="Medium">Medium Priority</option>
                     <option value="High">High Priority</option>
@@ -1012,12 +1095,12 @@ export default function DashboardPage() {
                   </select>
                 </div>
 
-                <select className="w-full border p-2 rounded-xl" value={newTaskFolder || ""} onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
+                <select className="w-full border p-2 rounded-xl" value={newTaskFolder || ""} onChange={(e) => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
                   <option value="">No Folder (All Tasks)</option>
-                  {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  {folders.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
 
-                <select className="w-full border p-2 rounded-xl" value={newStatus} onChange={e => setNewStatus(e.target.value as Status)}>
+                <select className="w-full border p-2 rounded-xl" value={newStatus} onChange={(e) => setNewStatus(e.target.value as Status)}>
                   <option value="not_started">Not Started</option>
                   <option value="in_progress">In Progress</option>
                 </select>

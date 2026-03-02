@@ -71,6 +71,10 @@ export default function DashboardPage() {
   const [editId, setEditId] = useState<number | null>(null);
   const [selectedFolder, setSelectedFolder] = useState<number | null>(null);
   const [activeFolderForShare, setActiveFolderForShare] = useState<number | null>(null);
+  const [showShareTaskModal, setShowShareTaskModal] = useState(false);
+  const [activeTaskForShare, setActiveTaskForShare] = useState<number | null>(null);
+  const [taskShareEmail, setTaskShareEmail] = useState("");
+  const [isSharingTask, setIsSharingTask] = useState(false);
 
   // Form states
   const [newTask, setNewTask] = useState("");
@@ -219,10 +223,9 @@ export default function DashboardPage() {
       }
 
       const { data: taskRows, error: taskError } = await supabase
-        .from("tasks_v2")
-        .select("id, title, description, due_date, priority, is_completed, created_at, category_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
+  .from("tasks_v2")
+  .select("id, title, description, due_date, priority, is_completed, created_at, category_id")
+  .order("created_at", { ascending: false });
 
       if (!taskError && taskRows) {
         const mapped: Task[] = taskRows.map((row) => {
@@ -356,17 +359,18 @@ export default function DashboardPage() {
     const existingTask = editId !== null ? tasks.find((t) => t.id === editId) : null;
 
     const payload = {
-      user_id: user.id,
-      category_id: newCategoryId,
-      title: newTask.trim(),
-      description: newDescription.trim() || null,
-      due_date: newDue || null,
-      priority: priorityToInt(newPriority),
-      is_completed: existingTask?.done ?? false,
-    };
+  created_by: user.id,
+  user_id: user.id, // ✅ ADD THIS LINE
+  category_id: newCategoryId,
+  title: newTask.trim(),
+  description: newDescription.trim() || null,
+  due_date: newDue || null,
+  priority: priorityToInt(newPriority),
+  is_completed: existingTask?.done ?? false,
+};
 
     if (editId !== null) {
-      await supabase.from("tasks_v2").update(payload).eq("id", editId).eq("user_id", user.id);
+      await supabase.from("tasks_v2").update(payload).eq("id", editId);
       setTasks((prev) =>
         prev.map((t) =>
           t.id === editId
@@ -390,8 +394,12 @@ export default function DashboardPage() {
         .insert(payload)
         .select("id, created_at")
         .single();
-
       if (!error && data) {
+        await supabase.from("task_members").insert({
+          task_id: data.id,
+          user_id: user.id,
+          role: "owner",
+  });
         const t: Task = {
           id: data.id,
           text: payload.title,
@@ -429,7 +437,7 @@ export default function DashboardPage() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
     if (!user) return;
-    await supabase.from("tasks_v2").delete().eq("id", id).eq("user_id", user.id);
+    await supabase.from("tasks_v2").delete().eq("id", id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
   };
 
@@ -440,7 +448,7 @@ export default function DashboardPage() {
     const user = userData.user;
     if (!user) return;
     const nextDone = !task.done;
-    await supabase.from("tasks_v2").update({ is_completed: nextDone }).eq("id", id).eq("user_id", user.id);
+    await supabase.from("tasks_v2").update({ is_completed: nextDone }).eq("id", id);
     setTasks((prev) =>
       prev.map((t) => {
         if (t.id === id) {
@@ -453,9 +461,60 @@ export default function DashboardPage() {
     );
   };
 
-  const setTaskStatus = (id: number, status: Status) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)));
-  };
+const shareTask = async () => {
+  if (!activeTaskForShare) return;
+  if (!taskShareEmail.trim()) {
+    alert("Please enter an email.");
+    return;
+  }
+
+  if (isSharingTask) return;
+  setIsSharingTask(true);
+
+  try {
+    const email = taskShareEmail.trim().toLowerCase();
+
+    if (email === userEmail.trim().toLowerCase()) {
+      alert("You can't share a task with yourself.");
+      return;
+    }
+
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("email", email)
+      .single();
+
+    if (profileError || !profile) {
+      alert("User not found.");
+      return;
+    }
+
+    const { error: upsertError } = await supabase
+      .from("task_members")
+      .upsert(
+        {
+          task_id: activeTaskForShare,
+          user_id: profile.id,
+          role: "editor",
+        },
+        { onConflict: "task_id,user_id", ignoreDuplicates: true }
+      );
+
+    if (upsertError) {
+      alert(`Share failed: ${upsertError.message}`);
+      console.error(upsertError);
+      return;
+    }
+
+    alert("Task shared successfully!");
+    setShowShareTaskModal(false);
+    setTaskShareEmail("");
+    setActiveTaskForShare(null);
+  } finally {
+    setIsSharingTask(false);
+  }
+};
 
   // ─── Custom category add ──────────────────────────────────────────────────
   const addCustomCategory = async (val: string) => {
@@ -997,8 +1056,29 @@ export default function DashboardPage() {
                               <div className="text-xs text-gray-500">Completed</div>
                             )}
                             <div className="flex items-center gap-2 mt-2">
-                              <button onClick={() => handleEdit(task)} className="p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition">Edit</button>
-                              <button onClick={() => deleteTask(task.id)} className="p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition">Delete</button>
+                              <button
+                                onClick={() => handleEdit(task)}
+                                className="p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition"
+                              >
+                                Edit
+                              </button>
+
+                               <button
+                                 onClick={() => deleteTask(task.id)}
+                                className="p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition"
+                             >
+                               Delete
+                                  </button>
+
+                                  <button
+                                    onClick={() => {
+                                    setActiveTaskForShare(task.id);
+                                    setShowShareTaskModal(true);
+                                 }}
+                                className="p-2 rounded-lg bg-[#e8f4ff] hover:bg-[#d6ebff] transition"
+                              >
+                                Share
+                                </button>
                             </div>
                           </div>
                         </div>
@@ -1114,6 +1194,10 @@ export default function DashboardPage() {
           </div>
         )}
 
+
+
+
+
         {/* Create Folder Modal */}
         {showCreateFolderModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center">
@@ -1145,6 +1229,56 @@ export default function DashboardPage() {
             </div>
           </div>
         )}
+
+
+       {/* Share Task Modal */}
+{showShareTaskModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div
+      className="absolute inset-0 bg-black/40"
+      onClick={() => {
+        setShowShareTaskModal(false);
+        setActiveTaskForShare(null);
+        setTaskShareEmail("");
+      }}
+    />
+    <div className="relative bg-white w-full max-w-sm rounded-2xl p-6 shadow-2xl border border-[#ffd6e8]/40 animate-modal-in">
+      <h3 className="text-lg font-semibold mb-2">Share Task</h3>
+      <p className="text-xs text-gray-500 mb-4">
+        Invite someone to collaborate on this task
+      </p>
+
+      <input
+        value={taskShareEmail}
+        onChange={(e) => setTaskShareEmail(e.target.value)}
+        className="w-full border p-2 rounded-xl"
+        placeholder="email@example.com"
+      />
+
+      <div className="flex justify-end gap-2 mt-4">
+        <button
+          onClick={() => {
+            setShowShareTaskModal(false);
+            setActiveTaskForShare(null);
+            setTaskShareEmail("");
+          }}
+          className="px-4 py-2 rounded-xl bg-gray-200"
+        >
+          Cancel
+        </button>
+
+        <button
+  onClick={shareTask}
+  disabled={isSharingTask}
+  className={`px-4 py-2 rounded-xl ${isSharingTask ? "opacity-60 cursor-not-allowed" : ""}`}
+  style={{ background: LIGHT_PINK }}
+>
+  Share
+</button>
+      </div>
+    </div>
+  </div>
+)} 
       </div>
     </main>
   );

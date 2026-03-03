@@ -4,6 +4,7 @@ import React, {
     useState,
     ReactNode,
 } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 export type Project = {
     id: string;
@@ -16,7 +17,7 @@ export type Project = {
 type ProjectsContextType = {
     projects: Project[];
     activeProjectId: string | null; // null = show projects grid
-    createProject: (name: string, color: string, icon: string) => void;
+    createProject: (name: string, color: string, icon: string) => Promise<boolean>;
     updateProject: (
         id: string,
         updates: { name?: string; color?: string; icon?: string }
@@ -52,24 +53,63 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     // Start with grid view (no project selected)
     const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
 
-    const createProject = (name: string, color: string, icon: string) => {
-        if (!name.trim()) return;
+    const createProject: ProjectsContextType["createProject"] = async (
+        name,
+        color,
+        icon
+    ) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return false;
 
-        const id = `${name
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "-")}-${Math.random().toString(36).slice(2, 6)}`;
+        const {
+            data: { user },
+            error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            console.error("Unable to create folder: no authenticated user.", userError);
+            return false;
+        }
+
+        const payload = {
+            user_id: user.id,
+            name: trimmedName,
+            color,
+        };
+
+        let { data, error } = await supabase
+            .from("folder")
+            .insert(payload)
+            .select("id, name, color, created_at")
+            .single();
+
+        if (error?.code === "42P01") {
+            const fallbackResult = await supabase
+                .from("folders")
+                .insert(payload)
+                .select("id, name, color, created_at")
+                .single();
+
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
+
+        if (error || !data) {
+            console.error("Failed to create folder in Supabase:", error);
+            return false;
+        }
 
         const project: Project = {
-            id,
-            name: name.trim(),
-            color,
+            id: String(data.id),
+            name: data.name,
+            color: data.color ?? color,
             icon,
-            createdAt: new Date().toISOString(),
+            createdAt: data.created_at ?? new Date().toISOString(),
         };
 
         setProjects((prev) => [...prev, project]);
-        setActiveProjectId(project.id); // jump into new project view
+        setActiveProjectId(project.id);
+        return true;
     };
 
     const updateProject = (

@@ -4,9 +4,10 @@ import React, {
     useState,
     ReactNode,
 } from "react";
+import { supabase } from "../../lib/supabaseClient";
 
 export type Project = {
-    id: string;
+    id: number;
     name: string;
     color: string; // hex
     icon: string;  // emoji or glyph
@@ -15,14 +16,14 @@ export type Project = {
 
 type ProjectsContextType = {
     projects: Project[];
-    activeProjectId: string | null; // null = show projects grid
-    createProject: (name: string, color: string, icon: string) => void;
+    activeProjectId: number | null; // null = show projects grid
+    createProject: (name: string, color: string, icon: string) => Promise<boolean>;
     updateProject: (
-        id: string,
+        id: number,
         updates: { name?: string; color?: string; icon?: string }
     ) => void;
-    setActiveProject: (id: string | null) => void;
-    deleteProject: (id: string) => void;
+    setActiveProject: (id: number | null) => void;
+    deleteProject: (id: number) => void;
 };
 
 const ProjectsContext = createContext<ProjectsContextType | undefined>(
@@ -32,48 +33,72 @@ const ProjectsContext = createContext<ProjectsContextType | undefined>(
 const DEFAULT_COLORS = ["#FACC15", "#4ADE80", "#60A5FA", "#FB7185", "#A855F7"];
 
 export function ProjectsProvider({ children }: { children: ReactNode }) {
-    const [projects, setProjects] = useState<Project[]>([
-        {
-            id: "inbox",
-            name: "Inbox",
-            color: DEFAULT_COLORS[0],
-            icon: "📥",
-            createdAt: new Date().toISOString(),
-        },
-        {
-            id: "school",
-            name: "School",
-            color: DEFAULT_COLORS[2],
-            icon: "📚",
-            createdAt: new Date().toISOString(),
-        },
-    ]);
+    const [projects, setProjects] = useState<Project[]>([]);
 
     // Start with grid view (no project selected)
-    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+    const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
 
-    const createProject = (name: string, color: string, icon: string) => {
-        if (!name.trim()) return;
+    const createProject: ProjectsContextType["createProject"] = async (
+        name,
+        color,
+        icon
+    ) => {
+        const trimmedName = name.trim();
+        if (!trimmedName) return false;
 
-        const id = `${name
-            .trim()
-            .toLowerCase()
-            .replace(/\s+/g, "-")}-${Math.random().toString(36).slice(2, 6)}`;
+        const {
+            data: { user },
+            error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError || !user) {
+            console.error("Unable to create folder: no authenticated user.", userError);
+            return false;
+        }
+
+        const payload = {
+            user_id: user.id,
+            name: trimmedName,
+            color,
+        };
+
+        let { data, error } = await supabase
+            .from("folder")
+            .insert(payload)
+            .select("id, name, color, created_at")
+            .single();
+
+        if (error?.code === "42P01") {
+            const fallbackResult = await supabase
+                .from("folders")
+                .insert(payload)
+                .select("id, name, color, created_at")
+                .single();
+
+            data = fallbackResult.data;
+            error = fallbackResult.error;
+        }
+
+        if (error || !data) {
+            console.error("Failed to create folder in Supabase:", error);
+            return false;
+        }
 
         const project: Project = {
-            id,
-            name: name.trim(),
-            color,
+            id: data.id,
+            name: data.name,
+            color: data.color ?? color,
             icon,
-            createdAt: new Date().toISOString(),
+            createdAt: data.created_at ?? new Date().toISOString(),
         };
 
         setProjects((prev) => [...prev, project]);
-        setActiveProjectId(project.id); // jump into new project view
+        setActiveProjectId(project.id);
+        return true;
     };
 
     const updateProject = (
-        id: string,
+        id: number,
         updates: { name?: string; color?: string; icon?: string }
     ) => {
         setProjects((prev) =>
@@ -81,12 +106,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         );
     };
 
-    const deleteProject = (id: string) => {
+    const deleteProject = (id: number) => {
         setProjects((prev) => prev.filter((p) => p.id !== id));
         setActiveProjectId((current) => (current === id ? null : current));
     };
 
-    const setActiveProject = (id: string | null) => {
+    const setActiveProject = (id: number | null) => {
         setActiveProjectId(id);
     };
 

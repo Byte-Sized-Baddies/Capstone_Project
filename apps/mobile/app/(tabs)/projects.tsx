@@ -66,9 +66,10 @@ export default function ProjectsScreen() {
         return tasks.filter((t) => t.projectId === activeProject.id);
     }, [tasks, activeProject]);
 
-    const handleCreate = () => {
+    const handleCreate = async () => {
         if (!projectName.trim()) return;
-        createProject(projectName, selectedColor, selectedIcon);
+        const created = await createProject(projectName, selectedColor, selectedIcon);
+        if (!created) return;
         setProjectName("");
         setSelectedColor(COLOR_CHOICES[0]);
         setSelectedIcon(ICON_CHOICES[0]);

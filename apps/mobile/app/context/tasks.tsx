@@ -39,7 +39,7 @@ export type Task = {
   priority: TaskPriority;
   category?: string | null;
   categoryId?: number | null;
-  projectId?: string | null;
+  projectId?: number | null;
 
   attachments: TaskAttachment[];
 };
@@ -51,7 +51,7 @@ export type NewTaskInput = {
   dueTime?: string | null;
   priority?: TaskPriority;
   category?: string | null;
-  projectId?: string | null;
+  projectId?: number | null;
   attachments?: TaskAttachment[];
 };
 
@@ -154,7 +154,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
     const { data: taskRows, error: taskError } = await supabase
       .from("tasks_v2")
-      .select("id, title, description, due_date, priority, is_completed, created_at, category_id")
+      .select("id, title, description, due_date, priority, is_completed, created_at, category_id, folder_id")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -173,7 +173,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         priority: intToPriority(row.priority ?? 0),
         category: categoryName,
         categoryId: row.category_id ?? null,
-        projectId: null,
+        projectId: row.folder_id ?? null,
         attachments: [],
       };
     });
@@ -210,6 +210,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
           .insert({
             user_id: user.id,
             category_id: categoryId,
+            folder_id: projectId,
             title: title.trim(),
             description: description?.trim() || null,
             due_date: dueDate || null,
@@ -283,15 +284,13 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         return t;
       });
     });
-  }, []);
+
+    // Sync to database
     void (async () => {
       const task = tasks.find((t) => t.id === id);
       if (!task) return;
 
       const nextDone = !task.done;
-      setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, done: nextDone } : t))
-      );
 
       const { error } = await supabase
         .from("tasks_v2")
@@ -300,6 +299,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error("Toggle failed:", error);
+        // Revert on error
         setTasks((prev) =>
           prev.map((t) => (t.id === id ? { ...t, done: task.done } : t))
         );
@@ -341,6 +341,7 @@ export function TasksProvider({ children }: { children: ReactNode }) {
         payload.priority = priorityToInt(updates.priority);
       if (updates.done !== undefined) payload.is_completed = updates.done;
       if (updates.category !== undefined) payload.category_id = categoryId;
+      if (updates.projectId !== undefined) payload.folder_id = updates.projectId;
 
       const { error } = await supabase
         .from("tasks_v2")

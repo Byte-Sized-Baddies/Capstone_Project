@@ -7,7 +7,7 @@ import React, {
 import { supabase } from "../../lib/supabaseClient";
 
 export type Project = {
-    id: string;
+    id: number;
     name: string;
     color: string; // hex
     icon: string;  // emoji or glyph
@@ -16,14 +16,14 @@ export type Project = {
 
 type ProjectsContextType = {
     projects: Project[];
-    activeProjectId: string | null; // null = show projects grid
+    activeProjectId: number | null; // null = show projects grid
     createProject: (name: string, color: string, icon: string) => Promise<boolean>;
     updateProject: (
-        id: string,
+        id: number,
         updates: { name?: string; color?: string; icon?: string }
     ) => void;
-    setActiveProject: (id: string | null) => void;
-    deleteProject: (id: string) => void;
+    setActiveProject: (id: number | null) => void;
+    deleteProject: (id: number) => void;
 };
 
 const ProjectsContext = createContext<ProjectsContextType | undefined>(
@@ -33,25 +33,10 @@ const ProjectsContext = createContext<ProjectsContextType | undefined>(
 const DEFAULT_COLORS = ["#FACC15", "#4ADE80", "#60A5FA", "#FB7185", "#A855F7"];
 
 export function ProjectsProvider({ children }: { children: ReactNode }) {
-    const [projects, setProjects] = useState<Project[]>([
-        {
-            id: "inbox",
-            name: "Inbox",
-            color: DEFAULT_COLORS[0],
-            icon: "📥",
-            createdAt: new Date().toISOString(),
-        },
-        {
-            id: "school",
-            name: "School",
-            color: DEFAULT_COLORS[2],
-            icon: "📚",
-            createdAt: new Date().toISOString(),
-        },
-    ]);
+    const [projects, setProjects] = useState<Project[]>([]);
 
     // Start with grid view (no project selected)
-    const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
+    const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
 
     const createProject: ProjectsContextType["createProject"] = async (
         name,
@@ -100,7 +85,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         }
 
         const project: Project = {
-            id: String(data.id),
+            id: data.id,
             name: data.name,
             color: data.color ?? color,
             icon,
@@ -113,7 +98,7 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
     };
 
     const updateProject = (
-        id: string,
+        id: number,
         updates: { name?: string; color?: string; icon?: string }
     ) => {
         setProjects((prev) =>
@@ -121,12 +106,12 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         );
     };
 
-    const deleteProject = (id: string) => {
+    const deleteProject = (id: number) => {
         setProjects((prev) => prev.filter((p) => p.id !== id));
         setActiveProjectId((current) => (current === id ? null : current));
     };
 
-    const setActiveProject = (id: string | null) => {
+    const setActiveProject = (id: number | null) => {
         setActiveProjectId(id);
     };
 

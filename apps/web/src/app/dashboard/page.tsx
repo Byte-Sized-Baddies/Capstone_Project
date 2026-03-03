@@ -188,7 +188,7 @@ export default function DashboardPage() {
 
       const { data: taskRows, error: taskError } = await supabase
         .from("tasks_v2")
-        .select("id, title, description, due_date, priority, is_completed, created_at, category_id")
+        .select("id, title, description, due_date, priority, is_completed, created_at, category_id, folder_id")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
 
@@ -206,6 +206,7 @@ export default function DashboardPage() {
             priority: intToPriority(row.priority ?? 0),
             category: categoryName,
             categoryId: row.category_id ?? null,
+            folderId: row.folder_id ?? null,
           };
         });
         setTasks(mapped);
@@ -389,6 +390,7 @@ export default function DashboardPage() {
     const payload = {
       user_id: user.id,
       category_id: newCategoryId,
+      folder_id: newTaskFolder,
       title: newTask.trim(),
       description: newDescription.trim() || null,
       due_date: newDue || null,

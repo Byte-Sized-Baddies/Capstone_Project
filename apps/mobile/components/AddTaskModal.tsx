@@ -71,7 +71,7 @@ export default function AddTaskModal() {
   const [dueTime, setDueTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("low");
   const [category, setCategory] = useState("School");
-  const [projectId, setProjectId] = useState<string | null>(activeProjectId);
+  const [projectId, setProjectId] = useState<number | null>(activeProjectId);
 
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
 

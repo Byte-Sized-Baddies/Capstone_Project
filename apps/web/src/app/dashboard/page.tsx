@@ -36,6 +36,7 @@ const priorityOptions: Priority[] = ["Low", "Medium", "High"];
 type Folder = {
   id: number;
   name: string;
+  color?: string | null;
   owner: string;
   collaborators: string[];
   created: number;
@@ -194,21 +195,21 @@ export default function DashboardPage() {
 
       if (!taskError && taskRows) {
         const mapped: Task[] = taskRows.map((row) => {
-          const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
-          return {
-            id: row.id,
-            text: row.title,
-            description: row.description ?? "",
-            due: row.due_date ?? "No date",
-            done: !!row.is_completed,
-            status: row.is_completed ? "in_progress" : "not_started",
-            created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-            priority: intToPriority(row.priority ?? 0),
-            category: categoryName,
-            categoryId: row.category_id ?? null,
-            folderId: row.folder_id ?? null,
-          };
-        });
+  const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
+  return {
+    id: row.id,
+    text: row.title,
+    description: row.description ?? "",
+    due: row.due_date ?? "No date",
+    done: !!row.is_completed,
+    status: "not_started",
+    created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    priority: intToPriority(row.priority ?? 0),
+    category: categoryName,
+    categoryId: row.category_id ?? null,
+    folderId: row.folder_id ?? null,
+  };
+});
         setTasks(mapped);
       }
     };
@@ -216,37 +217,83 @@ export default function DashboardPage() {
     loadCategoriesAndTasks();
   }, [newCategoryId]);
 
-  useEffect(() => {
-    const loadFolders = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) return;
+ useEffect(() => {
+  const loadFolders = async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const user = userData?.user;
 
-      const { data: folderRows, error } = await supabase
+    if (userError || !user) {
+      console.error("Failed to get user:", userError);
+      return;
+    }
+
+    // 1) Owned folders
+    const { data: ownedRows, error: ownedError } = await supabase
+      .from("folders")
+      .select("id, user_id, name, color, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (ownedError) {
+      console.error("Failed to load owned folders:", ownedError);
+      alert(`Failed to load owned folders: ${ownedError.message}`);
+      return;
+    }
+
+    // 2) Membership rows for this user
+    const { data: memberRows, error: memberError } = await supabase
+      .from("folder_members")
+      .select("folder_id, role")
+      .eq("user_id", user.id);
+
+    if (memberError) {
+      console.error("Failed to load shared folder memberships:", memberError);
+      alert(`Failed to load shared folders: ${memberError.message}`);
+      return;
+    }
+
+    const sharedFolderIds = [...new Set((memberRows ?? []).map((row) => row.folder_id))];
+
+    // Remove any folder ids the user already owns
+    const ownedIds = new Set((ownedRows ?? []).map((row) => row.id));
+    const onlySharedIds = sharedFolderIds.filter((id) => !ownedIds.has(id));
+
+    let sharedRows: any[] = [];
+
+    // 3) Load shared folders
+    if (onlySharedIds.length > 0) {
+      const { data, error } = await supabase
         .from("folders")
-        .select("id, name, created_at")
-        .eq("user_id", user.id)
+        .select("id, user_id, name, color, created_at")
+        .in("id", onlySharedIds)
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.error("Failed to load folders:", error);
+        console.error("Failed to load shared folders:", error);
+        alert(`Failed to load shared folders: ${error.message}`);
         return;
       }
 
-      const mapped: Folder[] = (folderRows ?? []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        owner: userEmail,
-        collaborators: [],
-        created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-      }));
+      sharedRows = data ?? [];
+    }
 
-      setFolders(mapped);
-    };
+    // 4) Merge owned + shared
+    const allRows = [...(ownedRows ?? []), ...sharedRows];
 
-    loadFolders();
-  }, [userEmail]);
+    const mapped: Folder[] = allRows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      color: row.color,
+      owner: row.user_id === user.id ? (user.email || "") : "shared",
+      collaborators: [],
+      created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    }));
 
+    setFolders(mapped);
+  };
+
+  loadFolders();
+}, []);
 
   // Persist state
   useEffect(() => localStorage.setItem("tasks", JSON.stringify(tasks)), [tasks]);
@@ -285,67 +332,121 @@ export default function DashboardPage() {
 
     const { data, error } = await supabase
       .from("folders")
-      .insert({ user_id: user.id, name })
-      .select("id, name, created_at")
+      .insert({ name, color: "#f5e99f"})
+      .select("id, name, color, created_at")
       .single();
 
     if (error || !data) {
-      console.error("Folder insert failed:", error);
-      alert(`Failed to create folder: ${error?.message ?? "Unknown error"}`);
-      return;
-    }
+  console.error("Folder insert failed:", {
+    error,
+    data,
+    userId: user.id,
+    name,
+  });
+  alert(`Failed to create folder: ${error?.message ?? "Unknown error"}`);
+  return;
+}
     
     const folder: Folder = {
-      id: data.id,
-      name: data.name,
-      owner: userEmail,
-      collaborators: [],
-      created: data.created_at ? new Date(data.created_at).getTime() : Date.now()
-    };
+  id: data.id,
+  name: data.name,
+  color: data.color,
+  owner: userEmail,
+  collaborators: [],
+  created: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
+};
     
     setFolders(prev => [folder, ...prev]);
     setNewFolderName("");
     setShowCreateFolderModal(false);
   };
 
-  const deleteFolder = (folderId: number) => {
-    if (!confirm("Delete this folder? Tasks will be moved to 'All Tasks'.")) return;
-    
-    // Move tasks out of folder
-    setTasks(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: null } : t));
-    setFolders(prev => prev.filter(f => f.id !== folderId));
-    
-    if (selectedFolder === folderId) {
-      setSelectedFolder(null);
-    }
-  };
+  const deleteFolder = async (folderId: number) => {
+  if (!confirm("Delete this folder? Tasks will be moved to 'All Tasks'.")) return;
 
-  const shareFolder = () => {
-    const email = shareEmail.trim().toLowerCase();
-    if (!email) return alert("Please enter an email");
-    if (!activeFolderForShare) return;
+  const { data: userData } = await supabase.auth.getUser();
+  const user = userData.user;
+  if (!user) return;
     
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!re.test(email)) return alert("Please enter a valid email");
-    
-    if (email === userEmail) return alert("You can't share with yourself");
-    
-    setFolders(prev => prev.map(f => {
-      if (f.id === activeFolderForShare) {
-        if (f.collaborators.includes(email)) {
-          alert("Already shared with this user");
-          return f;
-        }
-        alert(`Folder shared with ${email}`);
-        return { ...f, collaborators: [...f.collaborators, email] };
-      }
-      return f;
-    }));
-    
-    setShareEmail("");
-    setShowShareFolderModal(false);
-    setActiveFolderForShare(null);
-  };
+    // Move tasks out of folder in DB
+  const { error: taskUpdateError } = await supabase
+    .from("tasks_v2")
+    .update({ folder_id: null })
+    .eq("folder_id", folderId)
+    .eq("user_id", user.id);
+
+  if (taskUpdateError) {
+    console.error("Failed to move tasks out of folder:", taskUpdateError);
+    return alert("Could not update tasks");
+  }
+
+// Delete collaborators first if needed
+  await supabase
+    .from("folder_members")
+    .delete()
+    .eq("folder_id", folderId);
+
+  // Delete folder
+  const { error: folderDeleteError } = await supabase
+    .from("folders")
+    .delete()
+    .eq("id", folderId)
+    .eq("user_id", user.id);
+
+  if (folderDeleteError) {
+    console.error("Failed to delete folder:", folderDeleteError);
+    return alert("Could not delete folder");
+  }
+
+  setTasks(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: null } : t));
+  setFolders(prev => prev.filter(f => f.id !== folderId));
+
+  if (selectedFolder === folderId) {
+    setSelectedFolder(null);
+  }
+};
+
+  const shareFolder = async () => {
+  const email = shareEmail.trim().toLowerCase();
+  if (!email) return alert("Please enter an email");
+  if (!activeFolderForShare) return alert("No folder selected");
+
+  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!re.test(email)) return alert("Please enter a valid email");
+
+  if (email === userEmail.toLowerCase()) {
+    return alert("You can't share with yourself");
+  }
+
+  // Look up the invited user
+  const { data: invitedUser, error: invitedUserError } = await supabase
+    .from("profiles")
+    .select("id, email")
+    .eq("email", email)
+    .single();
+
+  if (invitedUserError || !invitedUser) {
+    console.error("Could not find invited user:", invitedUserError);
+    return alert("That user was not found");
+  }
+
+  const { error: insertError } = await supabase
+    .from("folder_members")
+    .insert({
+      folder_id: activeFolderForShare,
+      user_id: invitedUser.id,
+    });
+
+  if (insertError) {
+    console.error("Failed to share folder:", insertError);
+    return alert(`Failed to share folder: ${insertError.message}`);
+  }
+
+  alert(`Folder shared with ${email}`);
+  setShareEmail("");
+  setShowShareFolderModal(false);
+  setActiveFolderForShare(null);
+};
 
   const removeCollaborator = (folderId: number, email: string) => {
     if (!confirm(`Remove ${email} from this folder?`)) return;
@@ -406,15 +507,16 @@ export default function DashboardPage() {
         .eq("user_id", user.id);
 
       setTasks(prev => prev.map(t => t.id === editId ? {
-        ...t,
-        text: payload.title,
-        description: payload.description ?? "",
-        due: payload.due_date ?? "No date",
-        priority: newPriority,
-        category: newCategory,
-        categoryId: newCategoryId,
-        status: newStatus
-      } : t));
+  ...t,
+  text: payload.title,
+  description: payload.description ?? "",
+  due: payload.due_date ?? "No date",
+  priority: newPriority,
+  category: newCategory,
+  categoryId: newCategoryId,
+  folderId: newTaskFolder,
+  status: newStatus
+} : t));
       setEditId(null);
     } else {
       const { data, error } = await supabase
@@ -488,7 +590,11 @@ export default function DashboardPage() {
 
     setTasks(prev => prev.map(t => {
       if (t.id === id) {
-        const updated = { ...t, done: nextDone };
+        const updated = {
+  ...t,
+  done: nextDone,
+  status: nextDone ? "not_started" : t.status,
+}
         // send notification on completion
         if (!t.done && updated.done) sendNotification(`Task Completed`, `${t.text}`);
         return updated;

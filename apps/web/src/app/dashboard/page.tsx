@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
 
-
 type Status = "not_started" | "in_progress";
 type Priority = "Low" | "Medium" | "High";
 type PriorityFilter = "All" | Priority;
@@ -48,7 +47,6 @@ const LIGHT_PINK = "#ffd6e8";
 
 export default function DashboardPage() {
   const router = useRouter();
-  
   
   // User state
   const [userEmail, setUserEmail] = useState<string>("");
@@ -97,7 +95,6 @@ export default function DashboardPage() {
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   // Session Check
-  // Session Check
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
@@ -107,7 +104,6 @@ export default function DashboardPage() {
       }
       const user = data.session.user;
       setUserEmail(user.email || "");
-      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       setDisplayName(name);
     };
@@ -124,7 +120,6 @@ export default function DashboardPage() {
   }, [router]);
 
   // Logout
-  // Logout
   const handleLogout = async () => {
     await supabase.auth.signOut();
     localStorage.removeItem("tasks");
@@ -136,20 +131,17 @@ export default function DashboardPage() {
   };
 
   // Debounce search
-  // Debounce search
   useEffect(() => {
     const t = setTimeout(() => setSearchQuery(rawSearch.trim()), 280);
     return () => clearTimeout(t);
   }, [rawSearch]);
 
   // Load saved state
-  // Load saved state
   useEffect(() => {
     const saved = localStorage.getItem("tasks");
     const savedCat = localStorage.getItem("categories");
     const savedAvatar = localStorage.getItem("avatar");
     const savedName = localStorage.getItem("displayName");
-    
     
     if (saved) {
       try { setTasks(JSON.parse(saved)); } catch { setTasks([]); }
@@ -170,10 +162,6 @@ export default function DashboardPage() {
     setSortBy(params.get("s") ?? "added");
 
 
-  }, []);
-
-  // load categories + tasks from Supabase
-  useEffect(() => {
   }, []);
 
   // load categories + tasks from Supabase
@@ -204,28 +192,9 @@ export default function DashboardPage() {
         .select("id, title, description, due_date, priority, is_completed, created_at, category_id, folder_id")
         .eq("user_id", user.id)
         .order("created_at", { ascending: false });
-        .from("tasks_v2")
-        .select("id, title, description, due_date, priority, is_completed, created_at, category_id, folder_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
 
       if (!taskError && taskRows) {
         const mapped: Task[] = taskRows.map((row) => {
-          const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
-          return {
-            id: row.id,
-            text: row.title,
-            description: row.description ?? "",
-            due: row.due_date ?? "No date",
-            done: !!row.is_completed,
-            status: row.is_completed ? "in_progress" : "not_started",
-            created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-            priority: intToPriority(row.priority ?? 0),
-            category: categoryName,
-            categoryId: row.category_id ?? null,
-            folderId: row.folder_id ?? null,
-          };
-        });
   const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
   return {
     id: row.id,
@@ -246,41 +215,6 @@ export default function DashboardPage() {
     };
 
     loadCategoriesAndTasks();
-  }, [newCategoryId]);
-
-  useEffect(() => {
-    const loadFolders = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) return;
-
-      const { data: folderRows, error } = await supabase
-        .from("folders")
-        .select("id, name, created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Failed to load folders:", error);
-        return;
-      }
-
-      const mapped: Folder[] = (folderRows ?? []).map((row) => ({
-        id: row.id,
-        name: row.name,
-        owner: userEmail,
-        collaborators: [],
-        created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-      }));
-
-      setFolders(mapped);
-    };
-
-    loadFolders();
-  }, [userEmail]);
-
-
-  // Persist state
   }, [newCategoryId]);
 
  useEffect(() => {
@@ -368,19 +302,8 @@ export default function DashboardPage() {
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
 
   // Sync filters to URL
-  // Sync filters to URL
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (rawSearch) params.set("q", rawSearch);
-    else params.delete("q");
-    if (categoryFilter && categoryFilter !== "All") params.set("cat", categoryFilter);
-    else params.delete("cat");
-    if (priorityFilter && priorityFilter !== "All") params.set("p", priorityFilter);
-    else params.delete("p");
-    if (dateFilter) params.set("d", dateFilter);
-    else params.delete("d");
-    if (sortBy) params.set("s", sortBy);
-    else params.delete("s");
     if (rawSearch) params.set("q", rawSearch);
     else params.delete("q");
     if (categoryFilter && categoryFilter !== "All") params.set("cat", categoryFilter);
@@ -397,39 +320,8 @@ export default function DashboardPage() {
 
   // Folder management
   const createFolder = async () => {
-  // Folder management
-  const createFolder = async () => {
     const name = newFolderName.trim();
     if (!name) return alert("Please enter a folder name");
-
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (!user) {
-      alert("You must be logged in to create a folder");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("folders")
-      .insert({ user_id: user.id, name })
-      .select("id, name, created_at")
-      .single();
-
-    if (error || !data) {
-      console.error("Folder insert failed:", error);
-      alert(`Failed to create folder: ${error?.message ?? "Unknown error"}`);
-      return;
-    }
-    
-    const folder: Folder = {
-      id: data.id,
-      name: data.name,
-      owner: userEmail,
-      collaborators: [],
-      created: data.created_at ? new Date(data.created_at).getTime() : Date.now()
-    };
-    
-    setFolders(prev => [folder, ...prev]);
 
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
@@ -469,17 +361,6 @@ export default function DashboardPage() {
     setShowCreateFolderModal(false);
   };
 
-  const deleteFolder = (folderId: number) => {
-    if (!confirm("Delete this folder? Tasks will be moved to 'All Tasks'.")) return;
-    
-    // Move tasks out of folder
-    setTasks(prev => prev.map(t => t.folderId === folderId ? { ...t, folderId: null } : t));
-    setFolders(prev => prev.filter(f => f.id !== folderId));
-    
-    if (selectedFolder === folderId) {
-      setSelectedFolder(null);
-    }
-  };
   const deleteFolder = async (folderId: number) => {
   if (!confirm("Delete this folder? Tasks will be moved to 'All Tasks'.")) return;
 
@@ -525,32 +406,6 @@ export default function DashboardPage() {
   }
 };
 
-  const shareFolder = () => {
-    const email = shareEmail.trim().toLowerCase();
-    if (!email) return alert("Please enter an email");
-    if (!activeFolderForShare) return;
-    
-    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!re.test(email)) return alert("Please enter a valid email");
-    
-    if (email === userEmail) return alert("You can't share with yourself");
-    
-    setFolders(prev => prev.map(f => {
-      if (f.id === activeFolderForShare) {
-        if (f.collaborators.includes(email)) {
-          alert("Already shared with this user");
-          return f;
-        }
-        alert(`Folder shared with ${email}`);
-        return { ...f, collaborators: [...f.collaborators, email] };
-      }
-      return f;
-    }));
-    
-    setShareEmail("");
-    setShowShareFolderModal(false);
-    setActiveFolderForShare(null);
-  };
   const shareFolder = async () => {
   const email = shareEmail.trim().toLowerCase();
   if (!email) return alert("Please enter an email");
@@ -602,23 +457,12 @@ export default function DashboardPage() {
       }
       return f;
     }));
-    
-    setFolders(prev => prev.map(f => {
-      if (f.id === folderId) {
-        return { ...f, collaborators: f.collaborators.filter(c => c !== email) };
-      }
-      return f;
-    }));
   };
 
   const canEditFolder = (folder: Folder) => {
     return folder.owner === userEmail || folder.collaborators.includes(userEmail);
   };
-  const canEditFolder = (folder: Folder) => {
-    return folder.owner === userEmail || folder.collaborators.includes(userEmail);
-  };
 
-  // Task management
   // Task management
   const resetForm = () => {
     setNewTask("");
@@ -633,7 +477,6 @@ export default function DashboardPage() {
     setEditId(null);
   };
 
-  // add/edit
   // add/edit
   const handleAddOrEdit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -655,33 +498,8 @@ export default function DashboardPage() {
       priority: priorityToInt(newPriority),
       is_completed: existingTask?.done ?? false,
     };
-      user_id: user.id,
-      category_id: newCategoryId,
-      folder_id: newTaskFolder,
-      title: newTask.trim(),
-      description: newDescription.trim() || null,
-      due_date: newDue || null,
-      priority: priorityToInt(newPriority),
-      is_completed: existingTask?.done ?? false,
-    };
 
     if (editId !== null) {
-      await supabase
-        .from("tasks_v2")
-        .update(payload)
-        .eq("id", editId)
-        .eq("user_id", user.id);
-
-      setTasks(prev => prev.map(t => t.id === editId ? {
-        ...t,
-        text: payload.title,
-        description: payload.description ?? "",
-        due: payload.due_date ?? "No date",
-        priority: newPriority,
-        category: newCategory,
-        categoryId: newCategoryId,
-        status: newStatus
-      } : t));
       await supabase
         .from("tasks_v2")
         .update(payload)
@@ -707,7 +525,6 @@ export default function DashboardPage() {
         .select("id, created_at")
         .single();
 
-
       if (!error && data) {
         const t: Task = {
           id: data.id,
@@ -721,9 +538,7 @@ export default function DashboardPage() {
           category: newCategory,
           categoryId: newCategoryId,
           folderId: newTaskFolder
-          folderId: newTaskFolder
         };
-        setTasks(prev => [t, ...prev]);
         setTasks(prev => [t, ...prev]);
       }
     }
@@ -756,42 +571,17 @@ export default function DashboardPage() {
       .eq("user_id", user.id);
 
     setTasks(prev => prev.filter(t => t.id !== id));
-
-    await supabase
-      .from("tasks_v2")
-      .delete()
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    setTasks(prev => prev.filter(t => t.id !== id));
   };
 
   const toggleDone = async (id: number) => {
     const task = tasks.find((t) => t.id === id);
     if (!task) return;
 
-
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
     if (!user) return;
 
-
     const nextDone = !task.done;
-    await supabase
-      .from("tasks_v2")
-      .update({ is_completed: nextDone })
-      .eq("id", id)
-      .eq("user_id", user.id);
-
-    setTasks(prev => prev.map(t => {
-      if (t.id === id) {
-        const updated = { ...t, done: nextDone };
-        // send notification on completion
-        if (!t.done && updated.done) sendNotification(`Task Completed`, `${t.text}`);
-        return updated;
-      }
-      return t;
-    }));
     await supabase
       .from("tasks_v2")
       .update({ is_completed: nextDone })
@@ -816,12 +606,7 @@ export default function DashboardPage() {
   const setTaskStatus = (id: number, status: Status) => {
     setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
   };
-  
-  const setTaskStatus = (id: number, status: Status) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status } : t));
-  };
 
-  // custom category add
   // custom category add
   const addCustomCategory = async (val: string) => {
     const v = val.trim();
@@ -836,10 +621,6 @@ export default function DashboardPage() {
 
     const { data: userData, error: userError } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (userError || !user) {
-      alert("You must be logged in to create a category.");
-      return;
-    }
     if (userError || !user) {
       alert("You must be logged in to create a category.");
       return;
@@ -873,12 +654,7 @@ export default function DashboardPage() {
   };
 
   // Filter tasks by folder
-  // Filter tasks by folder
   const tasksInView = useMemo(() => {
-    if (selectedFolder === null) {
-      return tasks;
-    }
-    return tasks.filter(t => t.folderId === selectedFolder);
     if (selectedFolder === null) {
       return tasks;
     }
@@ -886,12 +662,9 @@ export default function DashboardPage() {
   }, [tasks, selectedFolder]);
 
   // Apply search and filters
-  // Apply search and filters
   const filteredSorted = useMemo(() => {
     const q = searchQuery.toLowerCase();
     const today = new Date().toISOString().split("T")[0];
-    
-    let result = tasksInView.filter(t => {
     
     let result = tasksInView.filter(t => {
       if (q) {
@@ -901,11 +674,6 @@ export default function DashboardPage() {
       if (categoryFilter !== "All" && t.category !== categoryFilter) return false;
       if (priorityFilter !== "All" && t.priority !== priorityFilter) return false;
       if (dateFilter) {
-        if (dateFilter === "today") {
-          if (t.due !== today) return false;
-        } else {
-          if (t.due !== dateFilter) return false;
-        }
         if (dateFilter === "today") {
           if (t.due !== today) return false;
         } else {
@@ -931,11 +699,7 @@ export default function DashboardPage() {
   }, [tasksInView, searchQuery, categoryFilter, priorityFilter, dateFilter, sortBy]);
 
   // Stats
-  // Stats
   const total = tasksInView.length;
-  const completedCount = tasksInView.filter(t => t.done).length;
-  const inProgressCount = tasksInView.filter(t => !t.done && t.status === "in_progress").length;
-  const notStartedCount = tasksInView.filter(t => !t.done && t.status === "not_started").length;
   const completedCount = tasksInView.filter(t => t.done).length;
   const inProgressCount = tasksInView.filter(t => !t.done && t.status === "in_progress").length;
   const notStartedCount = tasksInView.filter(t => !t.done && t.status === "not_started").length;
@@ -945,9 +709,7 @@ export default function DashboardPage() {
   const notStartedPercent = total ? Math.round((notStartedCount / total) * 100) : 0;
 
   // Progress component
-  // Progress component
   const CircleProgress: React.FC<{ percent: number; size?: number }> = ({ percent, size = 64 }) => {
-    const r = (size / 2) - 6;
     const r = (size / 2) - 6;
     const c = 2 * Math.PI * r;
     const dash = (percent / 100) * c;
@@ -960,11 +722,9 @@ export default function DashboardPage() {
           </linearGradient>
         </defs>
         <g transform={`translate(${size/2},${size/2})`}>
-        <g transform={`translate(${size/2},${size/2})`}>
           <circle r={r} cx={0} cy={0} fill="transparent" stroke="#fff3c4" strokeWidth="8" />
           <circle r={r} cx={0} cy={0} fill="transparent" stroke="url(#gp2)" strokeWidth="8"
             strokeDasharray={`${dash} ${c - dash}`} strokeLinecap="round" transform="rotate(-90)" />
-          <text x="0" y="4" textAnchor="middle" fontSize={size/5} fontWeight={700} fill="#1a1a1a">{percent}%</text>
           <text x="0" y="4" textAnchor="middle" fontSize={size/5} fontWeight={700} fill="#1a1a1a">{percent}%</text>
         </g>
       </svg>
@@ -972,15 +732,9 @@ export default function DashboardPage() {
   };
 
   // notifications helpers
-  // notifications helpers
   const sendNotification = useCallback((title: string, body?: string) => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
-    try {
-      new Notification(title, { body });
-    } catch {
-      // ignore
-    }
     try {
       new Notification(title, { body });
     } catch {
@@ -993,22 +747,15 @@ export default function DashboardPage() {
     if (Notification.permission !== "granted") return;
     const today = new Date().toISOString().split("T")[0];
     const dueToday = tasks.filter(t => t.due === today && !t.done);
-    const dueToday = tasks.filter(t => t.due === today && !t.done);
     dueToday.forEach((t, i) => {
       setTimeout(() => sendNotification("Due Today", `${t.text} is due today`), i * 400);
     });
   }, [sendNotification, tasks]);
 
   // request notification permission on first open (if default)
-  // request notification permission on first open (if default)
   useEffect(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission === "default") {
-      // prompt once
-      Notification.requestPermission().then(() => {
-        // after permission choose, if granted send due-today notifications
-        sendDueTodayNotifications();
-      }).catch(() => {});
       // prompt once
       Notification.requestPermission().then(() => {
         // after permission choose, if granted send due-today notifications
@@ -1019,10 +766,6 @@ export default function DashboardPage() {
     }
   }, [sendDueTodayNotifications]);
 
-  // avatar initial fallback
-  const getInitials = (name = displayName) => {
-    return name.split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase();
-  };
   // avatar initial fallback
   const getInitials = (name = displayName) => {
     return name.split(" ").map(n => n[0]).slice(0,2).join("").toUpperCase();
@@ -1039,7 +782,6 @@ export default function DashboardPage() {
     Low: "bg-[#fff8c2] text-[#5a5000]",
     Medium: "bg-[#f5e99f] text-[#3a3200]",
     High: "bg-[#1a1a1a] text-[#fffbe6]"
-    High: "bg-[#1a1a1a] text-[#fffbe6]"
   };
 
   const beeCategoryColor: Record<string, string> = {
@@ -1055,24 +797,14 @@ export default function DashboardPage() {
 
   const activeFolderName = selectedFolder ? folders.find(f => f.id === selectedFolder)?.name || "Unknown" : "All Tasks";
 
-    Other: "bg-[#ffeeb3] text-[#4a3f00]"
-  };
-
-  const focusSearch = () => { searchRef.current?.focus(); };
-
-  const activeFolderName = selectedFolder ? folders.find(f => f.id === selectedFolder)?.name || "Unknown" : "All Tasks";
-
   return (
-    <main className={`min-h-screen bg-[#fafafa] p-6 relative text-[#1a1a1a] transition-all duration-300 ${sidebarOpen ? "ml-80" : "ml-0"}`}>
     <main className={`min-h-screen bg-[#fafafa] p-6 relative text-[#1a1a1a] transition-all duration-300 ${sidebarOpen ? "ml-80" : "ml-0"}`}>
       <style>{inlineStyles}</style>
 
       {/* SIDEBAR */}
       <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-2xl font-extrabold">Do Bee</h2>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
           <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
         </div>
 
@@ -1090,16 +822,12 @@ export default function DashboardPage() {
               />
             ) : (
               <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">{getInitials()}</div>
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">{getInitials()}</div>
             )}
-            <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full border shadow cursor-pointer text-xs">✎</label>
-            <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
             <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full border shadow cursor-pointer text-xs">✎</label>
             <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
           </div>
           <div>
             <div className="text-sm font-medium">{displayName}</div>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="text-xs mt-1 border rounded px-2 py-1" />
             <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="text-xs mt-1 border rounded px-2 py-1" />
           </div>
         </div>
@@ -1108,16 +836,9 @@ export default function DashboardPage() {
         <nav className="space-y-3 animate-slide-in mb-6">
           <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow bg-[#ffd6e8] hover:bg-[#ffd6e8] transition" href="/dashboard">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
-          <a className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow bg-[#ffd6e8] hover:bg-[#ffd6e8] transition" href="/dashboard">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
             <span className="font-medium">Dashboard</span>
           </a>
 
-          {/* CALENDAR */}
-          <a
-            href="/calendar"
-            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
-          >
           {/* CALENDAR */}
           <a
             href="/calendar"
@@ -1134,11 +855,6 @@ export default function DashboardPage() {
             href="/statistics"
             className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
           >
-          {/* STATISTICS */}
-          <a
-            href="/statistics"
-            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
-          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" />
             </svg>
@@ -1150,14 +866,8 @@ export default function DashboardPage() {
             href="/settings"
             className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
           >
-          {/* SETTINGS */}
-          <a
-            href="/settings"
-            className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition"
-          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
               <path
-                d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 003 9.11V8z"
                 d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 003 9.11V8z"
                 fill="#1a1a1a"
               />
@@ -1171,13 +881,10 @@ export default function DashboardPage() {
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-semibold">Folders</h4>
             <button onClick={() => setShowCreateFolderModal(true)} className="text-xs bg-[#f5e99f] px-3 py-1 rounded-lg hover:bg-[#ffe680] transition">+ New</button>
-            <button onClick={() => setShowCreateFolderModal(true)} className="text-xs bg-[#f5e99f] px-3 py-1 rounded-lg hover:bg-[#ffe680] transition">+ New</button>
           </div>
 
           <button 
-          <button 
             onClick={() => setSelectedFolder(null)}
-            className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition ${selectedFolder === null ? "bg-[#fff8d6] font-medium" : "hover:bg-white"}`}
             className={`w-full text-left px-3 py-2 rounded-lg mb-2 transition ${selectedFolder === null ? "bg-[#fff8d6] font-medium" : "hover:bg-white"}`}
           >
             📂 All Tasks ({tasks.length})
@@ -1185,22 +892,13 @@ export default function DashboardPage() {
 
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {folders.map(folder => {
-            {folders.map(folder => {
               const isOwner = folder.owner === userEmail;
-              const isCollaborator = folder.collaborators.includes(userEmail);
-              const taskCount = tasks.filter(t => t.folderId === folder.id).length;
-              
               const isCollaborator = folder.collaborators.includes(userEmail);
               const taskCount = tasks.filter(t => t.folderId === folder.id).length;
               
               return (
                 <div key={folder.id} className={`group px-3 py-2 rounded-lg transition ${selectedFolder === folder.id ? "bg-[#fff8d6]" : "hover:bg-white"}`}>
-                <div key={folder.id} className={`group px-3 py-2 rounded-lg transition ${selectedFolder === folder.id ? "bg-[#fff8d6]" : "hover:bg-white"}`}>
                   <div className="flex items-center justify-between">
-                    <button 
-                      onClick={() => setSelectedFolder(folder.id)}
-                      className="flex-1 text-left text-sm"
-                    >
                     <button 
                       onClick={() => setSelectedFolder(folder.id)}
                       className="flex-1 text-left text-sm"
@@ -1209,10 +907,8 @@ export default function DashboardPage() {
                       <span className="text-xs text-gray-500 ml-2">({taskCount})</span>
                     </button>
                     
-                    
                     {isOwner && (
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
-                        <button 
                         <button 
                           onClick={() => { setActiveFolderForShare(folder.id); setShowShareFolderModal(true); }}
                           className="p-1 rounded hover:bg-[#ffd6e8] text-xs"
@@ -1220,7 +916,6 @@ export default function DashboardPage() {
                         >
                           ➕
                         </button>
-                        <button 
                         <button 
                           onClick={() => deleteFolder(folder.id)}
                           className="p-1 rounded hover:bg-red-100 text-xs"
@@ -1232,21 +927,13 @@ export default function DashboardPage() {
                     )}
                   </div>
                   
-                  
                   {folder.collaborators.length > 0 && (
                     <div className="mt-2 text-xs text-gray-500">
                       <div className="font-medium mb-1">Shared with:</div>
                       {folder.collaborators.map(email => (
-                      {folder.collaborators.map(email => (
                         <div key={email} className="flex items-center justify-between py-1">
                           <span>{email}</span>
                           {isOwner && (
-                            <button 
-                              onClick={() => removeCollaborator(folder.id, email)}
-                              className="text-red-500 hover:text-red-700"
-                            >
-                              ✕
-                            </button>
                             <button 
                               onClick={() => removeCollaborator(folder.id, email)}
                               className="text-red-500 hover:text-red-700"
@@ -1265,10 +952,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Logout Button */}
-        {/* Logout Button */}
         <div className="mt-auto pt-6 border-t border-yellow-200">
-          <button 
-            onClick={handleLogout} 
           <button 
             onClick={handleLogout} 
             className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm"
@@ -1281,11 +965,6 @@ export default function DashboardPage() {
       {/* MAIN CONTENT */}
       <div className="max-w-7xl mx-auto">
         {/* Top Bar */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
-            {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>}
-
-            <div className="relative flex-1 sm:flex-none">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>}
@@ -1293,43 +972,31 @@ export default function DashboardPage() {
             <div className="relative">
               <div className="flex items-center bg-white rounded-3xl shadow-sm px-3 py-2 border border-transparent focus-within:ring-2 focus-within:ring-[#f5e99f] transition">
                 <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2"><path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
-                <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2"><path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
                 <input
                   ref={searchRef}
                   value={rawSearch}
                   onChange={(e) => setRawSearch(e.target.value)}
                   placeholder="Search tasks..."
-                  className="outline-none px-2 py-1 w-full sm:w-80 md:w-96 bg-transparent text-sm sm:text-base"
+                  className="outline-none px-2 py-1 w-80 md:w-96 bg-transparent"
                 />
-                {rawSearch && <button onClick={() => { setRawSearch(""); focusSearch(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
                 {rawSearch && <button onClick={() => { setRawSearch(""); focusSearch(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
+          <div className="flex items-center gap-3">
             <div className="text-sm text-gray-600 text-right">
-              <div className="font-semibold text-xs sm:text-sm">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })}</div>
-            </div>
-
               <div className="font-semibold">Today</div>
               <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}</div>
             </div>
 
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
-              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold text-sm">{getInitials()}</span>}
               {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
             </div>
           </div>
         </div>
 
         {/* Current Folder */}
-        <div className="mb-4 pr-4">
-          <h1 className="text-2xl sm:text-3xl font-bold">{activeFolderName}</h1>
-          {selectedFolder && folders.find(f => f.id === selectedFolder) && (
-            <p className="text-xs sm:text-sm text-gray-500 mt-1">
-              {folders.find(f => f.id === selectedFolder)?.owner === userEmail ? "You own this folder" : "Shared with you"}
         <div className="mb-4">
           <h1 className="text-3xl font-bold">{activeFolderName}</h1>
           {selectedFolder && folders.find(f => f.id === selectedFolder) && (
@@ -1344,9 +1011,6 @@ export default function DashboardPage() {
           {/* Task List */}
           <div className="lg:col-span-2 space-y-6">
             {/* Controls */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between flex-wrap gap-3">
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white text-sm">
             <div className="flex items-center justify-between flex-wrap gap-3">
               <div className="flex items-center gap-3">
                 <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white">
@@ -1356,12 +1020,10 @@ export default function DashboardPage() {
                   <option value="category">Sort by Category</option>
                 </select>
 
-                <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }} className={`px-3 py-2 rounded-xl border text-sm ${dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"}`}>
                 <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }} className={`px-3 py-2 rounded-xl border ${dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"}`}>
                   Today&apos;s Tasks
                 </button>
 
-                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as PriorityFilter)} className="border rounded-xl p-2 bg-white text-sm">
                 <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as PriorityFilter)} className="border rounded-xl p-2 bg-white">
                   <option value="All">Priority: All</option>
                   <option value="High">High</option>
@@ -1378,29 +1040,12 @@ export default function DashboardPage() {
               ) : (
                 <ul className="space-y-4">
                   {filteredSorted.map(task => (
-                    <li key={task.id} className={`group flex flex-col gap-4 p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`} style={{ background: task.done ? "#fffdf2" : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)", boxShadow: "0 8px 18px rgba(0,0,0,0.04)" }}>
-                      <div className="flex gap-4 items-start">
-                        <div className="shrink-0 flex flex-col items-center pt-1">
-                          <input type="checkbox" checked={task.done} onChange={() => toggleDone(task.id)} className="w-5 h-5 accent-[#f5e99f]" />
-                          <div className="text-xs text-gray-400 mt-2">{task.due === "No date" ? "No due" : task.due}</div>
-                        </div>
-                  {filteredSorted.map(task => (
                     <li key={task.id} className={`group flex gap-4 items-start p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`} style={{ background: task.done ? "#fffdf2" : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)", boxShadow: "0 8px 18px rgba(0,0,0,0.04)" }}>
                       <div className="shrink-0 flex flex-col items-center pt-1">
                         <input type="checkbox" checked={task.done} onChange={() => toggleDone(task.id)} className="w-5 h-5 accent-[#f5e99f]" />
                         <div className="text-xs text-gray-400 mt-2">{task.due === "No date" ? "No due" : task.due}</div>
                       </div>
 
-                        <div className="flex-1">
-                          <h3 className={`font-semibold text-lg ${task.done ? "line-through text-gray-500" : ""}`}>{task.text}</h3>
-                          <p className="text-sm text-gray-600 mt-1">{task.description}</p>
-
-                          <div className="flex flex-wrap items-center gap-2 mt-3">
-                            <span className={`px-2 py-1 rounded-full text-xs ${beePriorityColor[task.priority]}`}>{task.priority}</span>
-                            <span className={`px-2 py-1 rounded-full text-xs ${beeCategoryColor[task.category] ?? "bg-[#ffeeb3] text-[#4a3f00]"}`}>{task.category}</span>
-                          </div>
-                        </div>
-                      </div>
                       <div className="flex-1">
                         <div className="flex items-start justify-between">
                           <div>
@@ -1413,19 +1058,6 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
-                        {!task.done ? (
-                          <select value={task.status} onChange={(e) => setTaskStatus(task.id, e.target.value as Status)} className="border rounded-xl p-2 bg-white text-sm w-full sm:w-auto">
-                            <option value="not_started">Not Started</option>
-                            <option value="in_progress">In Progress</option>
-                          </select>
-                        ) : (
-                          <div className="text-xs text-gray-500">Completed</div>
-                        )}
-
-                        <div className="flex gap-2 w-full sm:w-auto">
-                          <button onClick={() => handleEdit(task)} className="flex-1 sm:flex-none p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition">Edit</button>
-                          <button onClick={() => deleteTask(task.id)} className="flex-1 sm:flex-none p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition">Delete</button>
                           <div className="flex flex-col items-end gap-2">
                             {!task.done ? (
                               <select value={task.status} onChange={(e) => setTaskStatus(task.id, e.target.value as Status)} className="border rounded-xl p-2 bg-white text-sm">
@@ -1458,7 +1090,6 @@ export default function DashboardPage() {
                 <div className="text-xs text-gray-500">Overview</div>
               </div>
 
-
               <div className="mt-4 grid grid-cols-1 gap-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1471,7 +1102,6 @@ export default function DashboardPage() {
                   <CircleProgress percent={overallPercent} size={64} />
                 </div>
 
-
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 flex items-center justify-center rounded-full bg-[#f5e99f] text-[#3a3200] font-semibold">P</div>
@@ -1482,7 +1112,6 @@ export default function DashboardPage() {
                   </div>
                   <CircleProgress percent={inProgressPercent} size={64} />
                 </div>
-
 
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -1501,7 +1130,6 @@ export default function DashboardPage() {
 
         {/* Floating Add Button */}
         <button onClick={() => { resetForm(); setShowModal(true); }} className="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#fffbe6] text-3xl rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:scale-105 transition-transform">➕</button>
-        <button onClick={() => { resetForm(); setShowModal(true); }} className="fixed bottom-8 right-8 bg-[#1a1a1a] text-[#fffbe6] text-3xl rounded-full w-16 h-16 flex items-center justify-center shadow-lg hover:scale-105 transition-transform">➕</button>
 
         {/* Task Modal */}
         {showModal && (
@@ -1510,25 +1138,11 @@ export default function DashboardPage() {
             <div className="relative bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-[#f5e99f]/30 animate-modal-in">
               <h2 className="text-lg font-semibold mb-3">{editId ? "Edit Task" : "Add Task"}</h2>
               <form onSubmit={(e) => { e.preventDefault(); handleAddOrEdit(); }} className="space-y-3">
-                <input classN                # Check what files have changed
-                git status
-                
-                # Stage all changes
-                git add .
-                
-                # Commit with a message
-                git commit -m "Add mobile responsive layout to dashboard"
-                
-                # Push to main branch
-                git push origin mainame="w-full border p-2 rounded-xl" value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Task name" />
-                <textarea className="w-full border p-2 rounded-xl" value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="Description" />
-                <input type="date" className="w-full border p-2 rounded-xl" value={newDue} onChange={e => setNewDue(e.target.value)} />
                 <input className="w-full border p-2 rounded-xl" value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Task name" />
                 <textarea className="w-full border p-2 rounded-xl" value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="Description" />
                 <input type="date" className="w-full border p-2 rounded-xl" value={newDue} onChange={e => setNewDue(e.target.value)} />
 
                 <div className="grid grid-cols-2 gap-3">
-                  <select className="w-full border p-2 rounded-xl" value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}>
                   <select className="w-full border p-2 rounded-xl" value={newPriority} onChange={e => setNewPriority(e.target.value as Priority)}>
                     <option value="Low">Low Priority</option>
                     <option value="Medium">Medium Priority</option>
@@ -1552,13 +1166,10 @@ export default function DashboardPage() {
                 </div>
 
                 <select className="w-full border p-2 rounded-xl" value={newTaskFolder || ""} onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
-                <select className="w-full border p-2 rounded-xl" value={newTaskFolder || ""} onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
                   <option value="">No Folder (All Tasks)</option>
-                  {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                   {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
 
-                <select className="w-full border p-2 rounded-xl" value={newStatus} onChange={e => setNewStatus(e.target.value as Status)}>
                 <select className="w-full border p-2 rounded-xl" value={newStatus} onChange={e => setNewStatus(e.target.value as Status)}>
                   <option value="not_started">Not Started</option>
                   <option value="in_progress">In Progress</option>
@@ -1600,10 +1211,6 @@ export default function DashboardPage() {
               <div className="flex justify-end gap-2 mt-4">
                 <button onClick={() => { setShowShareFolderModal(false); setActiveFolderForShare(null); }} className="px-4 py-2 rounded-xl bg-gray-200">Cancel</button>
                 <button onClick={shareFolder} className="px-4 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>Share</button>
-              </div>
-            </div>
-          </div>
-        )}
               </div>
             </div>
           </div>

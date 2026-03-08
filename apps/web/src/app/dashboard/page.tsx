@@ -859,11 +859,11 @@ export default function DashboardPage() {
       {/* MAIN CONTENT */}
       <div className="max-w-7xl mx-auto">
         {/* Top Bar */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
             {!sidebarOpen && <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>}
 
-            <div className="relative">
+            <div className="relative flex-1 sm:flex-none">
               <div className="flex items-center bg-white rounded-3xl shadow-sm px-3 py-2 border border-transparent focus-within:ring-2 focus-within:ring-[#f5e99f] transition">
                 <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2"><path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>
                 <input
@@ -871,30 +871,30 @@ export default function DashboardPage() {
                   value={rawSearch}
                   onChange={(e) => setRawSearch(e.target.value)}
                   placeholder="Search tasks..."
-                  className="outline-none px-2 py-1 w-80 md:w-96 bg-transparent"
+                  className="outline-none px-2 py-1 w-full sm:w-80 md:w-96 bg-transparent text-sm sm:text-base"
                 />
                 {rawSearch && <button onClick={() => { setRawSearch(""); focusSearch(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-end">
             <div className="text-sm text-gray-600 text-right">
-              <div className="font-semibold">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}</div>
+              <div className="font-semibold text-xs sm:text-sm">Today</div>
+              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "short", day: "2-digit", month: "short" })}</div>
             </div>
 
             <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
-              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
+              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold text-sm">{getInitials()}</span>}
             </div>
           </div>
         </div>
 
         {/* Current Folder */}
-        <div className="mb-4">
-          <h1 className="text-3xl font-bold">{activeFolderName}</h1>
+        <div className="mb-4 pr-4">
+          <h1 className="text-2xl sm:text-3xl font-bold">{activeFolderName}</h1>
           {selectedFolder && folders.find(f => f.id === selectedFolder) && (
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">
               {folders.find(f => f.id === selectedFolder)?.owner === userEmail ? "You own this folder" : "Shared with you"}
             </p>
           )}
@@ -905,20 +905,20 @@ export default function DashboardPage() {
           {/* Task List */}
           <div className="lg:col-span-2 space-y-6">
             {/* Controls */}
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between flex-wrap gap-3">
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="border rounded-xl p-2 bg-white text-sm">
                   <option value="added">Sort by Added</option>
                   <option value="due">Sort by Due Date</option>
                   <option value="alpha">Sort by A–Z</option>
                   <option value="category">Sort by Category</option>
                 </select>
 
-                <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }} className={`px-3 py-2 rounded-xl border ${dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"}`}>
+                <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }} className={`px-3 py-2 rounded-xl border text-sm ${dateFilter === new Date().toISOString().split("T")[0] ? "bg-[#f5e99f]" : "bg-white"}`}>
                   Today&apos;s Tasks
                 </button>
 
-                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as PriorityFilter)} className="border rounded-xl p-2 bg-white">
+                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as PriorityFilter)} className="border rounded-xl p-2 bg-white text-sm">
                   <option value="All">Priority: All</option>
                   <option value="High">High</option>
                   <option value="Medium">Medium</option>
@@ -934,39 +934,37 @@ export default function DashboardPage() {
               ) : (
                 <ul className="space-y-4">
                   {filteredSorted.map(task => (
-                    <li key={task.id} className={`group flex gap-4 items-start p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`} style={{ background: task.done ? "#fffdf2" : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)", boxShadow: "0 8px 18px rgba(0,0,0,0.04)" }}>
-                      <div className="shrink-0 flex flex-col items-center pt-1">
-                        <input type="checkbox" checked={task.done} onChange={() => toggleDone(task.id)} className="w-5 h-5 accent-[#f5e99f]" />
-                        <div className="text-xs text-gray-400 mt-2">{task.due === "No date" ? "No due" : task.due}</div>
+                    <li key={task.id} className={`group flex flex-col gap-4 p-4 rounded-2xl border ${task.done ? "opacity-60" : ""}`} style={{ background: task.done ? "#fffdf2" : "linear-gradient(180deg, #fff6f9 0%, #fffdf2 100%)", boxShadow: "0 8px 18px rgba(0,0,0,0.04)" }}>
+                      <div className="flex gap-4 items-start">
+                        <div className="shrink-0 flex flex-col items-center pt-1">
+                          <input type="checkbox" checked={task.done} onChange={() => toggleDone(task.id)} className="w-5 h-5 accent-[#f5e99f]" />
+                          <div className="text-xs text-gray-400 mt-2">{task.due === "No date" ? "No due" : task.due}</div>
+                        </div>
+
+                        <div className="flex-1">
+                          <h3 className={`font-semibold text-lg ${task.done ? "line-through text-gray-500" : ""}`}>{task.text}</h3>
+                          <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+
+                          <div className="flex flex-wrap items-center gap-2 mt-3">
+                            <span className={`px-2 py-1 rounded-full text-xs ${beePriorityColor[task.priority]}`}>{task.priority}</span>
+                            <span className={`px-2 py-1 rounded-full text-xs ${beeCategoryColor[task.category] ?? "bg-[#ffeeb3] text-[#4a3f00]"}`}>{task.category}</span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex-1">
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className={`font-semibold text-lg ${task.done ? "line-through text-gray-500" : ""}`}>{task.text}</h3>
-                            <p className="text-sm text-gray-600 mt-1">{task.description}</p>
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
+                        {!task.done ? (
+                          <select value={task.status} onChange={(e) => setTaskStatus(task.id, e.target.value as Status)} className="border rounded-xl p-2 bg-white text-sm w-full sm:w-auto">
+                            <option value="not_started">Not Started</option>
+                            <option value="in_progress">In Progress</option>
+                          </select>
+                        ) : (
+                          <div className="text-xs text-gray-500">Completed</div>
+                        )}
 
-                            <div className="flex items-center gap-2 mt-3">
-                              <span className={`px-2 py-1 rounded-full text-xs ${beePriorityColor[task.priority]}`}>{task.priority}</span>
-                              <span className={`px-2 py-1 rounded-full text-xs ${beeCategoryColor[task.category] ?? "bg-[#ffeeb3] text-[#4a3f00]"}`}>{task.category}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex flex-col items-end gap-2">
-                            {!task.done ? (
-                              <select value={task.status} onChange={(e) => setTaskStatus(task.id, e.target.value as Status)} className="border rounded-xl p-2 bg-white text-sm">
-                                <option value="not_started">Not Started</option>
-                                <option value="in_progress">In Progress</option>
-                              </select>
-                            ) : (
-                              <div className="text-xs text-gray-500">Completed</div>
-                            )}
-
-                            <div className="flex items-center gap-2 mt-2">
-                              <button onClick={() => handleEdit(task)} className="p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition">Edit</button>
-                              <button onClick={() => deleteTask(task.id)} className="p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition">Delete</button>
-                            </div>
-                          </div>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <button onClick={() => handleEdit(task)} className="flex-1 sm:flex-none p-2 rounded-lg bg-[#fff3f8] hover:bg-[#ffd6e8] transition">Edit</button>
+                          <button onClick={() => deleteTask(task.id)} className="flex-1 sm:flex-none p-2 rounded-lg bg-[#ffecec] hover:bg-red-200 transition">Delete</button>
                         </div>
                       </div>
                     </li>
@@ -1032,7 +1030,17 @@ export default function DashboardPage() {
             <div className="relative bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-[#f5e99f]/30 animate-modal-in">
               <h2 className="text-lg font-semibold mb-3">{editId ? "Edit Task" : "Add Task"}</h2>
               <form onSubmit={(e) => { e.preventDefault(); handleAddOrEdit(); }} className="space-y-3">
-                <input className="w-full border p-2 rounded-xl" value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Task name" />
+                <input classN                # Check what files have changed
+                git status
+                
+                # Stage all changes
+                git add .
+                
+                # Commit with a message
+                git commit -m "Add mobile responsive layout to dashboard"
+                
+                # Push to main branch
+                git push origin mainame="w-full border p-2 rounded-xl" value={newTask} onChange={e => setNewTask(e.target.value)} placeholder="Task name" />
                 <textarea className="w-full border p-2 rounded-xl" value={newDescription} onChange={e => setNewDescription(e.target.value)} placeholder="Description" />
                 <input type="date" className="w-full border p-2 rounded-xl" value={newDue} onChange={e => setNewDue(e.target.value)} />
 

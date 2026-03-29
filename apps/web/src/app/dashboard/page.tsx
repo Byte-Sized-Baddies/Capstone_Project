@@ -47,7 +47,9 @@ const LIGHT_PINK = "#ffd6e8";
 
 export default function DashboardPage() {
   const router = useRouter();
-  
+
+  const [userId, setUserId] = useState<string | null>(null);
+
   // User state
   const [userEmail, setUserEmail] = useState<string>("");
   const [displayName, setDisplayName] = useState<string>("User");
@@ -136,6 +138,15 @@ export default function DashboardPage() {
     return () => clearTimeout(t);
   }, [rawSearch]);
 
+  useEffect(() => {
+  const loadUser = async () => {
+    const { data } = await supabase.auth.getUser();
+    setUserId(data.user?.id ?? null);
+  };
+
+  loadUser();
+}, []);
+
   // Load saved state
   useEffect(() => {
     const saved = localStorage.getItem("tasks");
@@ -165,57 +176,45 @@ export default function DashboardPage() {
   }, []);
 
   // load categories + tasks from Supabase
-  useEffect(() => {
-    const loadCategoriesAndTasks = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData.user;
-      if (!user) return;
+useEffect(() => {
+  const loadCategoriesAndTasks = async () => {
+    const { data: userData, error: userError } = await supabase.auth.getUser();
 
-      const { data: catRows, error: catError } = await supabase
-        .from("categories_v2")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
+    const user = userData?.user;
+    if (userError || !user) {
+      console.error("User fetch failed:", userError);
+      return;
+    }
+
+    const { data: catRows, error: catError } = await supabase
+      .from("categories_v2")
+      .select("id, name")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+
+    if (catError) {
+      console.error("Category fetch error:", catError);
+      return;
+    }
+
+    if (catRows) {
+      setCategories(catRows);
 
       const categoryMap = new Map<number, string>();
-      if (!catError && catRows) {
-        setCategories(catRows);
-        catRows.forEach((c) => categoryMap.set(c.id, c.name));
-        if (catRows.length && newCategoryId === null) {
-          setNewCategoryId(catRows[0].id);
-          setNewCategory(catRows[0].name);
-        }
+      catRows.forEach((c) => categoryMap.set(c.id, c.name));
+
+      // AUTO-SELECT FIRST CATEGORY (IMPORTANT FIX)
+      if (catRows.length > 0 && newCategoryId === null) {
+        setNewCategoryId(catRows[0].id);
+        setNewCategory(catRows[0].name);
       }
-
-      const { data: taskRows, error: taskError } = await supabase
-        .from("tasks_v2")
-        .select("id, title, description, due_date, priority, is_completed, created_at, category_id, folder_id")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false });
-
-      if (!taskError && taskRows) {
-        const mapped: Task[] = taskRows.map((row) => {
-  const categoryName = row.category_id ? categoryMap.get(row.category_id) ?? "Uncategorized" : "Uncategorized";
-  return {
-    id: row.id,
-    text: row.title,
-    description: row.description ?? "",
-    due: row.due_date ?? "No date",
-    done: !!row.is_completed,
-    status: "not_started",
-    created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-    priority: intToPriority(row.priority ?? 0),
-    category: categoryName,
-    categoryId: row.category_id ?? null,
-    folderId: row.folder_id ?? null,
+    }
   };
-});
-        setTasks(mapped);
-      }
-    };
 
-    loadCategoriesAndTasks();
-  }, [newCategoryId]);
+  loadCategoriesAndTasks();
+}, []);
+
+
 
  useEffect(() => {
   const loadFolders = async () => {
@@ -284,7 +283,7 @@ export default function DashboardPage() {
       id: row.id,
       name: row.name,
       color: row.color,
-      owner: row.user_id === user.id ? (user.email || "") : "shared",
+      owner: row.user_id,
       collaborators: [],
       created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
     }));
@@ -332,7 +331,12 @@ export default function DashboardPage() {
 
     const { data, error } = await supabase
       .from("folders")
-      .insert({ name, color: "#f5e99f"})
+      .insert({ 
+  name, 
+  color: "#f5e99f",
+  user_id: user.id
+})
+
       .select("id, name, color, created_at")
       .single();
 
@@ -433,9 +437,11 @@ export default function DashboardPage() {
   const { error: insertError } = await supabase
     .from("folder_members")
     .insert({
-      folder_id: activeFolderForShare,
-      user_id: invitedUser.id,
-    });
+  folder_id: activeFolderForShare,
+  user_id: invitedUser.id,
+  role: "editor"
+});
+
 
   if (insertError) {
     console.error("Failed to share folder:", insertError);
@@ -478,73 +484,105 @@ export default function DashboardPage() {
   };
 
   // add/edit
-  const handleAddOrEdit = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    if (!newTask.trim()) return;
+const handleAddOrEdit = async (e?: React.FormEvent) => {
+  e?.preventDefault();
 
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (!user) return;
+  if (!newTask.trim()) {
+    alert("Task name is required");
+    return;
+  }
 
-    const existingTask = editId !== null ? tasks.find((t) => t.id === editId) : null;
+  if (!newCategoryId) {
+    alert("Please select a category");
+    return;
+  }
 
-    const payload = {
-      user_id: user.id,
-      category_id: newCategoryId,
-      folder_id: newTaskFolder,
-      title: newTask.trim(),
-      description: newDescription.trim() || null,
-      due_date: newDue || null,
-      priority: priorityToInt(newPriority),
-      is_completed: existingTask?.done ?? false,
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  const user = userData?.user;
+
+  if (userError || !user) {
+    alert("User not authenticated");
+    return;
+  }
+
+  const payload = {
+    user_id: user.id,
+    category_id: newCategoryId,
+    folder_id: newTaskFolder ?? null,
+    title: newTask.trim(),
+    description: newDescription.trim() || null,
+    due_date: newDue || null,
+    priority: priorityToInt(newPriority),
+    is_completed: false,
+    status: newStatus,
+  };
+
+  console.log("INSERT PAYLOAD:", payload);
+
+  if (editId !== null) {
+    const { error } = await supabase
+      .from("tasks_v2")
+      .update(payload)
+      .eq("id", editId)
+      .eq("user_id", user.id);
+
+    if (error) {
+      console.error(error);
+      alert(error.message);
+      return;
+    }
+
+    setTasks(prev =>
+      prev.map(t =>
+        t.id === editId
+          ? {
+              ...t,
+              text: payload.title,
+              description: payload.description ?? "",
+              due: payload.due_date ?? "No date",
+              done: payload.is_completed,
+              priority: intToPriority(payload.priority),
+              categoryId: payload.category_id,
+              folderId: payload.folder_id ?? null,
+              status: payload.status as Status,
+            }
+          : t
+      )
+    );
+  } else {
+    const { data, error } = await supabase
+      .from("tasks_v2")
+      .insert(payload)
+      .select("id, created_at")
+      .single();
+
+    if (error) {
+      console.error("Task insert failed:", error);
+      alert(error.message);
+      return;
+    }
+
+    const t: Task = {
+      id: data.id,
+      text: payload.title,
+      description: payload.description ?? "",
+      due: payload.due_date ?? "No date",
+      done: false,
+      status: newStatus,
+      created: new Date(data.created_at).getTime(),
+      priority: newPriority,
+      category: newCategory,
+      categoryId: newCategoryId,
+      folderId: newTaskFolder
     };
 
-    if (editId !== null) {
-      await supabase
-        .from("tasks_v2")
-        .update(payload)
-        .eq("id", editId)
-        .eq("user_id", user.id);
+    setTasks(prev => [t, ...prev]);
+  }
 
-      setTasks(prev => prev.map(t => t.id === editId ? {
-  ...t,
-  text: payload.title,
-  description: payload.description ?? "",
-  due: payload.due_date ?? "No date",
-  priority: newPriority,
-  category: newCategory,
-  categoryId: newCategoryId,
-  folderId: newTaskFolder,
-  status: newStatus
-} : t));
-      setEditId(null);
-    } else {
-      const { data, error } = await supabase
-        .from("tasks_v2")
-        .insert(payload)
-        .select("id, created_at")
-        .single();
+  resetForm();
+  setShowModal(false);
+};
 
-      if (!error && data) {
-        const t: Task = {
-          id: data.id,
-          text: payload.title,
-          description: payload.description ?? "",
-          due: payload.due_date ?? "No date",
-          done: false,
-          status: newStatus,
-          created: data.created_at ? new Date(data.created_at).getTime() : Date.now(),
-          priority: newPriority,
-          category: newCategory,
-          categoryId: newCategoryId,
-          folderId: newTaskFolder
-        };
-        setTasks(prev => [t, ...prev]);
-      }
-    }
-    resetForm();
-    setShowModal(false);
-  };
 
   const handleEdit = (task: Task) => {
     setEditId(task.id);
@@ -742,6 +780,8 @@ export default function DashboardPage() {
     }
   }, []);
 
+const notifiedRef = useRef(false);
+
   const sendDueTodayNotifications = useCallback(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission !== "granted") return;
@@ -753,18 +793,22 @@ export default function DashboardPage() {
   }, [sendNotification, tasks]);
 
   // request notification permission on first open (if default)
-  useEffect(() => {
-    if (typeof Notification === "undefined") return;
+ useEffect(() => {
+  if (typeof Notification === "undefined") return;
+
+  if (!notifiedRef.current) {
     if (Notification.permission === "default") {
-      // prompt once
       Notification.requestPermission().then(() => {
-        // after permission choose, if granted send due-today notifications
         sendDueTodayNotifications();
-      }).catch(() => {});
+      });
     } else if (Notification.permission === "granted") {
       sendDueTodayNotifications();
     }
-  }, [sendDueTodayNotifications]);
+
+    notifiedRef.current = true;
+  }
+}, [sendDueTodayNotifications]);
+
 
   // avatar initial fallback
   const getInitials = (name = displayName) => {
@@ -891,9 +935,9 @@ export default function DashboardPage() {
           </button>
 
           <div className="space-y-2 max-h-64 overflow-y-auto">
-            {folders.map(folder => {
-              const isOwner = folder.owner === userEmail;
-              const isCollaborator = folder.collaborators.includes(userEmail);
+{folders.map(folder => {
+  const isOwner = folder.owner === userId;
+  const isCollaborator = folder.collaborators.includes(userEmail);
               const taskCount = tasks.filter(t => t.folderId === folder.id).length;
               
               return (

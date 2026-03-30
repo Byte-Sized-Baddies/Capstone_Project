@@ -32,5 +32,5 @@ const nextConfig = {
     return config;
   },
 };
-
+process.env.NEXT_TELEMETRY_DISABLED = '1'
 export default nextConfig;

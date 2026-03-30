@@ -1,6 +1,6 @@
 // app/dashboard/page.tsx
 "use client";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
@@ -53,7 +53,7 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: "⚙️", active: false },
 ];
 
-export default function DashboardPage() {
+function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isDark, setIsDark] = useState(true);
@@ -864,5 +864,13 @@ export default function DashboardPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense>
+      <DashboardContent />
+    </Suspense>
   );
 }

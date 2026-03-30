@@ -284,9 +284,6 @@ export default function SettingsPage() {
   const ownedFolders = folders.filter(f => f.isOwner);
   const sharedFolders = folders.filter(f => !f.isOwner);
 
-  const ownedFolders = folders.filter(f => f.isOwner);
-  const sharedFolders = folders.filter(f => !f.isOwner);
-
   return (
     <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease, color 0.3s ease" }}>
       <style>{inlineStyles}</style>

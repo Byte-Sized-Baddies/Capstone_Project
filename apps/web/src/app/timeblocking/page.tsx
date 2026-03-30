@@ -82,6 +82,8 @@ export default function TimeBlockingPage() {
   const [durationMins, setDurationMins] = useState(0);
   const [blockColor, setBlockColor] = useState(BLOCK_COLORS[0]);
   const [showDurationModal, setShowDurationModal] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
+  const [conflictDays, setConflictDays] = useState<string[]>([]);
 
   const scheduleRef = useRef<HTMLDivElement>(null);
 
@@ -149,6 +151,23 @@ export default function TimeBlockingPage() {
 
   const getInitials = (name = displayName) => name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 
+  const formatDateLabel = (dateStr: string) => new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+
+  const getTaskScheduledDays = (taskId: number): string[] => {
+    const days: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key?.startsWith("timeblocks_")) continue;
+      const date = key.replace("timeblocks_", "");
+      if (date === selectedDate) continue;
+      try {
+        const stored = JSON.parse(localStorage.getItem(key) || "[]") as TimeBlock[];
+        if (stored.some(b => b.taskId === taskId)) days.push(date);
+      } catch { /* skip */ }
+    }
+    return days;
+  };
+
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => { setDraggingTask(task); setDraggingBlock(null); e.dataTransfer.effectAllowed = "copy"; };
   const handleBlockDragStart = (e: React.DragEvent, block: TimeBlock) => { e.stopPropagation(); setDraggingBlock(block); setDraggingTask(null); e.dataTransfer.effectAllowed = "move"; };
 
@@ -173,12 +192,35 @@ export default function TimeBlockingPage() {
       saveBlocks(blocks.map(b => b.id === draggingBlock.id ? { ...b, startHour: h, startMin: m } : b));
       setDraggingBlock(null);
     } else if (draggingTask) {
+      const scheduled = getTaskScheduledDays(draggingTask.id);
       setPendingTask(draggingTask); setPendingHour(h); setPendingMin(m);
       setDurationHrs(1); setDurationMins(0);
       setBlockColor(BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)]);
-      setShowDurationModal(true); setDraggingTask(null);
+      setDraggingTask(null);
+      if (scheduled.length > 0) {
+        setConflictDays(scheduled);
+        setShowConflictModal(true);
+      } else {
+        setShowDurationModal(true);
+      }
     }
     setDragOverHour(null);
+  };
+
+  const handleConflictChoice = (choice: "split" | "move") => {
+    if (choice === "move") {
+      conflictDays.forEach(date => {
+        const key = `timeblocks_${date}`;
+        try {
+          const stored = JSON.parse(localStorage.getItem(key) || "[]") as TimeBlock[];
+          const updated = stored.filter(b => b.taskId !== pendingTask?.id);
+          if (updated.length > 0) localStorage.setItem(key, JSON.stringify(updated));
+          else localStorage.removeItem(key);
+        } catch { /* skip */ }
+      });
+    }
+    setShowConflictModal(false);
+    setShowDurationModal(true);
   };
 
   const confirmBlock = () => {
@@ -419,6 +461,42 @@ export default function TimeBlockingPage() {
           </div>
         </div>
       </div>
+
+      {/* CONFLICT MODAL */}
+      {showConflictModal && pendingTask && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 fade-in" onClick={() => setShowConflictModal(false)} />
+          <div className="relative w-full max-w-sm rounded-3xl p-6 modal-in" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+            <div className="text-3xl mb-3 text-center">⚠️</div>
+            <h2 className="text-lg font-bold mb-2 text-center" style={{ color: t.text }}>Task Already Scheduled</h2>
+            <p className="text-sm text-center mb-4" style={{ color: t.textDim }}>
+              <strong style={{ color: t.text }}>{pendingTask.text}</strong> is already scheduled on:
+            </p>
+            <div className="rounded-xl p-3 mb-5 space-y-1" style={{ background: t.surfaceHover }}>
+              {conflictDays.map(d => (
+                <div key={d} className="flex items-center gap-2 text-sm" style={{ color: t.textMuted }}>
+                  <span>📅</span><span>{formatDateLabel(d)}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-center mb-4" style={{ color: t.textDim }}>What would you like to do?</p>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => handleConflictChoice("split")} className="w-full py-3 rounded-xl text-sm font-bold"
+                style={{ background: t.accent, color: t.accentText }}>
+                ✂️ Split — schedule on multiple days
+              </button>
+              <button onClick={() => handleConflictChoice("move")} className="w-full py-3 rounded-xl text-sm font-semibold"
+                style={{ background: t.surfaceHover, color: t.text, border: `1px solid ${t.border}` }}>
+                📌 Move here — remove from other days
+              </button>
+              <button onClick={() => { setShowConflictModal(false); setPendingTask(null); }} className="w-full py-3 rounded-xl text-sm font-medium"
+                style={{ color: t.textMuted }}>
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DURATION MODAL */}
       {showDurationModal && pendingTask && (

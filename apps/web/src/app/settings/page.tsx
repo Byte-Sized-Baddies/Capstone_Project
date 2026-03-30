@@ -18,7 +18,16 @@ const lightTheme = {
 };
 
 type Category = { id: number; name: string };
-type Folder = { id: number; name: string; owner: string; collaborators: string[]; created: number; };
+type Collaborator = { user_id: string; email: string; role: string };
+type Folder = {
+  id: number;
+  name: string;
+  owner: string;
+  taskCount: number;
+  isOwner: boolean;
+  collaborators: Collaborator[];
+  expanded: boolean;
+};
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -36,8 +45,22 @@ export default function SettingsPage() {
   const [newCategory, setNewCategory] = useState("");
   const [notifStatus, setNotifStatus] = useState("default");
 
-  useEffect(() => { const saved = localStorage.getItem("theme"); if (saved) setIsDark(saved === "dark"); }, []);
-  const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
+  // Folder state
+  const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
+  const [editingFolderName, setEditingFolderName] = useState("");
+  const [folderLoading, setFolderLoading] = useState<number | null>(null);
+  const [shareEmail, setShareEmail] = useState<Record<number, string>>({});
+  const [shareLoading, setShareLoading] = useState<number | null>(null);
+  const [removeLoading, setRemoveLoading] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved) setIsDark(saved === "dark");
+  }, []);
+
+  const toggleTheme = () => setIsDark(prev => {
+    localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev;
+  });
 
   useEffect(() => {
     const checkSession = async () => {
@@ -79,28 +102,77 @@ export default function SettingsPage() {
     loadCategories();
   }, [authReady]);
 
+  const loadFolders = async () => {
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+
+    const { data: taskData } = await supabase.from("tasks_v2").select("id, folder_id").eq("user_id", user.id);
+    setTasks(taskData ?? []);
+
+    const { data: ownedRows } = await supabase.from("folders").select("id, user_id, name, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
+    const { data: memberRows } = await supabase.from("folder_members").select("folder_id").eq("user_id", user.id);
+
+    const sharedFolderIds = [...new Set((memberRows ?? []).map((r: any) => r.folder_id))];
+    const ownedIds = new Set((ownedRows ?? []).map((r: any) => r.id));
+    const onlySharedIds = sharedFolderIds.filter(id => !ownedIds.has(id));
+
+    let sharedRows: any[] = [];
+    if (onlySharedIds.length > 0) {
+      const { data } = await supabase.from("folders").select("id, user_id, name, created_at").in("id", onlySharedIds);
+      sharedRows = data ?? [];
+    }
+
+    const allRows = [...(ownedRows ?? []), ...sharedRows];
+    const taskCounts = new Map<number, number>();
+    (taskData ?? []).forEach((tk: any) => {
+      if (tk.folder_id) taskCounts.set(tk.folder_id, (taskCounts.get(tk.folder_id) ?? 0) + 1);
+    });
+
+    // Load collaborators for owned folders
+    const collaboratorsMap = new Map<number, Collaborator[]>();
+    if ((ownedRows ?? []).length > 0) {
+      const ownedFolderIds = (ownedRows ?? []).map((r: any) => r.id);
+      const { data: memberData } = await supabase
+        .from("folder_members")
+        .select("folder_id, user_id, role")
+        .in("folder_id", ownedFolderIds);
+
+      if (memberData && memberData.length > 0) {
+        // Get emails for all collaborators
+        const collaboratorUserIds = memberData.map((m: any) => m.user_id);
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id, email")
+          .in("id", collaboratorUserIds);
+
+        const profileMap = new Map((profileData ?? []).map((p: any) => [p.id, p.email]));
+
+        memberData.forEach((m: any) => {
+          if (!collaboratorsMap.has(m.folder_id)) collaboratorsMap.set(m.folder_id, []);
+          collaboratorsMap.get(m.folder_id)!.push({
+            user_id: m.user_id,
+            email: profileMap.get(m.user_id) ?? "Unknown",
+            role: m.role,
+          });
+        });
+      }
+    }
+
+    setFolders(allRows.map(row => ({
+      id: row.id,
+      name: row.name,
+      owner: row.user_id,
+      taskCount: taskCounts.get(row.id) ?? 0,
+      isOwner: row.user_id === user.id,
+      collaborators: collaboratorsMap.get(row.id) ?? [],
+      expanded: false,
+    })));
+  };
+
   useEffect(() => {
     if (!authReady) return;
-    const loadData = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) return;
-
-      // Load tasks (just for folder counts)
-      const { data: taskData } = await supabase.from("tasks_v2").select("id, folder_id").eq("user_id", user.id);
-      setTasks(taskData ?? []);
-
-      // Load folders
-      const { data: ownedRows } = await supabase.from("folders").select("id, user_id, name, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
-      const { data: memberRows } = await supabase.from("folder_members").select("folder_id").eq("user_id", user.id);
-      const sharedFolderIds = [...new Set((memberRows ?? []).map(r => r.folder_id))];
-      const ownedIds = new Set((ownedRows ?? []).map(r => r.id));
-      const onlySharedIds = sharedFolderIds.filter(id => !ownedIds.has(id));
-      let sharedRows: any[] = [];
-      if (onlySharedIds.length > 0) { const { data } = await supabase.from("folders").select("id, user_id, name, created_at").in("id", onlySharedIds); sharedRows = data ?? []; }
-      setFolders([...(ownedRows ?? []), ...sharedRows].map(row => ({ id: row.id, name: row.name, owner: row.user_id, collaborators: [], created: new Date(row.created_at).getTime() })));
-    };
-    loadData();
+    loadFolders();
   }, [authReady]);
 
   const handleLogout = async () => {
@@ -140,6 +212,122 @@ export default function SettingsPage() {
     setCustomCategories(prev => prev.filter(c => c.id !== cat.id));
   };
 
+  // ─── Folder: Toggle expand ─────────────────────────────────────────────────
+  const toggleFolderExpanded = (folderId: number) => {
+    setFolders(prev => prev.map(f => f.id === folderId ? { ...f, expanded: !f.expanded } : f));
+  };
+
+  // ─── Folder: Rename ───────────────────────────────────────────────────────
+  const startEditFolder = (folder: Folder) => {
+    setEditingFolderId(folder.id);
+    setEditingFolderName(folder.name);
+  };
+
+  const saveEditFolder = async (folderId: number) => {
+    const name = editingFolderName.trim();
+    if (!name) return;
+    setFolderLoading(folderId);
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+    const { error } = await supabase.from("folders").update({ name }).eq("id", folderId).eq("user_id", user.id);
+    if (error) alert(`Failed to rename: ${error.message}`);
+    else setFolders(prev => prev.map(f => f.id === folderId ? { ...f, name } : f));
+    setEditingFolderId(null);
+    setFolderLoading(null);
+  };
+
+  // ─── Folder: Delete ───────────────────────────────────────────────────────
+  const deleteFolder = async (folderId: number) => {
+    if (!confirm("Delete this folder? Tasks inside will be moved to All Tasks.")) return;
+    setFolderLoading(folderId);
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+    await supabase.from("tasks_v2").update({ folder_id: null }).eq("folder_id", folderId).eq("user_id", user.id);
+    await supabase.from("folder_members").delete().eq("folder_id", folderId);
+    const { error } = await supabase.from("folders").delete().eq("id", folderId).eq("user_id", user.id);
+    if (error) alert(`Failed to delete: ${error.message}`);
+    else setFolders(prev => prev.filter(f => f.id !== folderId));
+    setFolderLoading(null);
+  };
+
+  // ─── Folder: Leave ────────────────────────────────────────────────────────
+  const leaveFolder = async (folderId: number) => {
+    if (!confirm("Leave this shared folder? You'll lose access to its tasks.")) return;
+    setFolderLoading(folderId);
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+    const { error } = await supabase.from("folder_members").delete().eq("folder_id", folderId).eq("user_id", user.id);
+    if (error) alert(`Failed to leave: ${error.message}`);
+    else setFolders(prev => prev.filter(f => f.id !== folderId));
+    setFolderLoading(null);
+  };
+
+  // ─── Folder: Add collaborator ─────────────────────────────────────────────
+  const addCollaborator = async (folderId: number) => {
+    const email = (shareEmail[folderId] ?? "").trim().toLowerCase();
+    if (!email) return alert("Please enter an email");
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!re.test(email)) return alert("Please enter a valid email");
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+    if (email === user.email?.toLowerCase()) return alert("You can't share with yourself");
+
+    const folder = folders.find(f => f.id === folderId);
+    if (folder?.collaborators.find(c => c.email.toLowerCase() === email)) {
+      return alert("This person already has access");
+    }
+
+    setShareLoading(folderId);
+    const { data: invitedUser, error: lookupError } = await supabase
+      .from("profiles").select("id, email").eq("email", email).single();
+
+    if (lookupError || !invitedUser) {
+      setShareLoading(null);
+      return alert("No account found with that email");
+    }
+
+    const { error: insertError } = await supabase.from("folder_members").insert({
+      folder_id: folderId, user_id: invitedUser.id, role: "editor"
+    });
+
+    if (insertError) {
+      alert(`Failed to add collaborator: ${insertError.message}`);
+    } else {
+      setFolders(prev => prev.map(f => f.id === folderId ? {
+        ...f,
+        collaborators: [...f.collaborators, { user_id: invitedUser.id, email: invitedUser.email, role: "editor" }]
+      } : f));
+      setShareEmail(prev => ({ ...prev, [folderId]: "" }));
+    }
+    setShareLoading(null);
+  };
+
+  // ─── Folder: Remove collaborator ──────────────────────────────────────────
+  const removeCollaborator = async (folderId: number, collaboratorUserId: string, collaboratorEmail: string) => {
+    if (!confirm(`Remove ${collaboratorEmail} from this folder?`)) return;
+    setRemoveLoading(`${folderId}-${collaboratorUserId}`);
+
+    const { error } = await supabase.from("folder_members")
+      .delete()
+      .eq("folder_id", folderId)
+      .eq("user_id", collaboratorUserId);
+
+    if (error) {
+      alert(`Failed to remove: ${error.message}`);
+    } else {
+      setFolders(prev => prev.map(f => f.id === folderId ? {
+        ...f,
+        collaborators: f.collaborators.filter(c => c.user_id !== collaboratorUserId)
+      } : f));
+    }
+    setRemoveLoading(null);
+  };
+
   const enableNotifications = () => {
     Notification.requestPermission().then(p => {
       setNotifStatus(p);
@@ -154,10 +342,13 @@ export default function SettingsPage() {
     * { font-family: 'DM Sans', sans-serif; }
     @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
     .slide-up { animation: slideUp 0.35s ease-out forwards; }
     .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+    .slide-down { animation: slideDown 0.2s ease-out forwards; }
     ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
+    input:focus { outline: none; border-color: ${t.accent} !important; }
   `;
 
   if (!authReady) {
@@ -167,6 +358,9 @@ export default function SettingsPage() {
       </div>
     );
   }
+
+  const ownedFolders = folders.filter(f => f.isOwner);
+  const sharedFolders = folders.filter(f => !f.isOwner);
 
   return (
     <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease, color 0.3s ease" }}>
@@ -200,7 +394,6 @@ export default function SettingsPage() {
               </a>
             ))}
           </nav>
-          {/* Folders */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: t.textDim }}>Folders</div>
             <a href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1 text-sm" style={{ color: t.textDim }}>
@@ -208,17 +401,13 @@ export default function SettingsPage() {
               <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{tasks.length}</span>
             </a>
             <div className="space-y-1 max-h-48 overflow-y-auto">
-              {folders.map(folder => {
-                const isOwner = folder.owner === userId;
-                const taskCount = tasks.filter((tk: any) => tk.folder_id === folder.id).length;
-                return (
-                  <a key={folder.id} href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm" style={{ color: t.textDim }}>
-                    <span>{isOwner ? "📁" : "🤝"}</span>
-                    <span className="flex-1 truncate">{folder.name}</span>
-                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{taskCount}</span>
-                  </a>
-                );
-              })}
+              {folders.map(folder => (
+                <a key={folder.id} href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm" style={{ color: t.textDim }}>
+                  <span>{folder.isOwner ? "📁" : "🤝"}</span>
+                  <span className="flex-1 truncate">{folder.name}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{folder.taskCount}</span>
+                </a>
+              ))}
             </div>
           </div>
         </div>
@@ -248,6 +437,7 @@ export default function SettingsPage() {
       </header>
 
       <div className="p-6 max-w-3xl mx-auto space-y-5 slide-up">
+
         {/* Profile */}
         <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
           <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Profile</div>
@@ -261,7 +451,7 @@ export default function SettingsPage() {
             </div>
             <div className="flex-1">
               <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: t.textDim }}>Display Name</label>
-              <input value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none text-sm" style={inputStyle} />
+              <input value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm" style={inputStyle} />
             </div>
           </div>
         </div>
@@ -286,11 +476,12 @@ export default function SettingsPage() {
           <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Notifications</div>
           <p className="text-sm mb-4" style={{ color: t.textMuted }}>Enable notifications for reminders and task completion alerts.</p>
           <div className="flex gap-3">
-            <button onClick={enableNotifications} className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+            <button onClick={enableNotifications}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold"
               style={{ background: notifStatus === "granted" ? t.success + "20" : t.surfaceHover, color: notifStatus === "granted" ? t.success : t.textMuted, border: `1px solid ${notifStatus === "granted" ? t.success + "40" : t.border}` }}>
               {notifStatus === "granted" ? "✓ Enabled" : "Enable Notifications"}
             </button>
-            <button onClick={() => { if (Notification.permission === "denied") alert("Notifications are blocked."); else if (Notification.permission === "default") enableNotifications(); else new Notification("Test Notification", { body: "This is a test notification!" }); }}
+            <button onClick={() => { if (Notification.permission === "denied") alert("Notifications are blocked."); else if (Notification.permission === "default") enableNotifications(); else new Notification("Test Notification", { body: "This is a test!" }); }}
               className="px-4 py-2.5 rounded-xl text-sm font-semibold" style={{ background: t.accent, color: t.accentText }}>Test</button>
           </div>
           <div className="text-xs mt-3" style={{ color: t.textDim }}>Status: <span style={{ color: t.textMuted }}>{notifStatus}</span></div>
@@ -302,7 +493,7 @@ export default function SettingsPage() {
           <div className="flex gap-2 mb-4">
             <input value={newCategory} onChange={e => setNewCategory(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") addCategory(); }}
-              placeholder="New category name..." className="flex-1 px-4 py-2.5 rounded-xl outline-none text-sm" style={inputStyle} />
+              placeholder="New category name..." className="flex-1 px-4 py-2.5 rounded-xl text-sm" style={inputStyle} />
             <button onClick={addCategory} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: t.accent, color: t.accentText }}>Add</button>
           </div>
           {customCategories.length === 0 ? (
@@ -322,6 +513,169 @@ export default function SettingsPage() {
             </div>
           )}
         </div>
+
+        {/* My Folders */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>My Folders</div>
+            <span className="text-xs px-2 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>
+              {ownedFolders.length} folder{ownedFolders.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+
+          {ownedFolders.length === 0 ? (
+            <div className="py-8 text-center">
+              <div className="text-3xl mb-2">📂</div>
+              <p className="text-sm" style={{ color: t.textDim }}>No folders yet. Create one on the dashboard.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {ownedFolders.map(folder => (
+                <div key={folder.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${t.border}` }}>
+                  {/* Folder header */}
+                  <div className="p-4" style={{ background: t.surfaceHover }}>
+                    {editingFolderId === folder.id ? (
+                      <div className="flex items-center gap-2">
+                        <input value={editingFolderName} onChange={e => setEditingFolderName(e.target.value)}
+                          onKeyDown={e => { if (e.key === "Enter") saveEditFolder(folder.id); if (e.key === "Escape") setEditingFolderId(null); }}
+                          autoFocus className="flex-1 px-3 py-2 rounded-lg text-sm" style={inputStyle} />
+                        <button onClick={() => saveEditFolder(folder.id)} disabled={folderLoading === folder.id}
+                          className="px-3 py-2 rounded-lg text-xs font-bold" style={{ background: t.accent, color: t.accentText }}>
+                          {folderLoading === folder.id ? "…" : "Save"}
+                        </button>
+                        <button onClick={() => setEditingFolderId(null)} className="px-3 py-2 rounded-lg text-xs"
+                          style={{ background: t.border, color: t.textMuted }}>Cancel</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3">
+                        <button onClick={() => toggleFolderExpanded(folder.id)} className="flex items-center gap-3 min-w-0 flex-1 text-left">
+                          <span className="text-xl">📁</span>
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold" style={{ color: t.text }}>{folder.name}</div>
+                            <div className="text-xs" style={{ color: t.textDim }}>
+                              {folder.taskCount} task{folder.taskCount !== 1 ? "s" : ""} · {folder.collaborators.length} collaborator{folder.collaborators.length !== 1 ? "s" : ""}
+                            </div>
+                          </div>
+                          <span className="text-xs ml-1" style={{ color: t.textDim }}>{folder.expanded ? "▲" : "▼"}</span>
+                        </button>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <button onClick={() => startEditFolder(folder)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                            style={{ background: t.border, color: t.textMuted }}>✎ Rename</button>
+                          <button onClick={() => deleteFolder(folder.id)} disabled={folderLoading === folder.id}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium"
+                            style={{ background: t.danger + "20", color: t.danger }}>
+                            {folderLoading === folder.id ? "…" : "🗑 Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Expanded: sharing panel */}
+                  {folder.expanded && (
+                    <div className="slide-down p-4 space-y-4" style={{ background: t.surface, borderTop: `1px solid ${t.border}` }}>
+
+                      {/* Add collaborator */}
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>Share With</div>
+                        <div className="flex gap-2">
+                          <input
+                            value={shareEmail[folder.id] ?? ""}
+                            onChange={e => setShareEmail(prev => ({ ...prev, [folder.id]: e.target.value }))}
+                            onKeyDown={e => { if (e.key === "Enter") addCollaborator(folder.id); }}
+                            placeholder="Enter email address..."
+                            className="flex-1 px-3 py-2.5 rounded-xl text-sm"
+                            style={inputStyle}
+                          />
+                          <button onClick={() => addCollaborator(folder.id)} disabled={shareLoading === folder.id}
+                            className="px-4 py-2.5 rounded-xl text-sm font-bold flex-shrink-0"
+                            style={{ background: t.accent, color: t.accentText }}>
+                            {shareLoading === folder.id ? "…" : "Add"}
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Collaborators list */}
+                      <div>
+                        <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>
+                          People with access ({folder.collaborators.length})
+                        </div>
+                        {folder.collaborators.length === 0 ? (
+                          <p className="text-xs py-3 text-center" style={{ color: t.textDim }}>No one else has access yet.</p>
+                        ) : (
+                          <div className="space-y-2">
+                            {folder.collaborators.map(collab => {
+                              const removeKey = `${folder.id}-${collab.user_id}`;
+                              return (
+                                <div key={collab.user_id} className="flex items-center justify-between p-3 rounded-xl"
+                                  style={{ background: t.surfaceHover }}>
+                                  <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+                                      style={{ background: t.accent + "30", color: t.accent }}>
+                                      {collab.email[0]?.toUpperCase() ?? "?"}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-medium truncate" style={{ color: t.text }}>{collab.email}</div>
+                                      <div className="text-xs capitalize" style={{ color: t.textDim }}>{collab.role}</div>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => removeCollaborator(folder.id, collab.user_id, collab.email)}
+                                    disabled={removeLoading === removeKey}
+                                    className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium ml-2"
+                                    style={{ background: t.danger + "20", color: t.danger }}>
+                                    {removeLoading === removeKey ? "…" : "Remove"}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Shared With Me */}
+        {sharedFolders.length > 0 && (
+          <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Shared With Me</div>
+              <span className="text-xs px-2 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>
+                {sharedFolders.length} folder{sharedFolders.length !== 1 ? "s" : ""}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {sharedFolders.map(folder => (
+                <div key={folder.id} className="p-4 rounded-xl flex items-center justify-between gap-3"
+                  style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xl">🤝</span>
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{folder.name}</div>
+                      <div className="text-xs" style={{ color: t.textDim }}>
+                        {folder.taskCount} task{folder.taskCount !== 1 ? "s" : ""} · Shared with you
+                      </div>
+                    </div>
+                  </div>
+                  <button onClick={() => leaveFolder(folder.id)} disabled={folderLoading === folder.id}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium flex-shrink-0"
+                    style={{ background: t.danger + "20", color: t.danger }}>
+                    {folderLoading === folder.id ? "…" : "Leave"}
+                  </button>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs mt-4" style={{ color: t.textDim }}>
+              Leaving removes your access. The folder and its tasks won&apos;t be deleted.
+            </p>
+          </div>
+        )}
       </div>
     </main>
   );

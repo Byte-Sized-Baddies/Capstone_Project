@@ -190,12 +190,14 @@ useEffect(() => {
       .from("categories_v2")
       .select("id, name")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: true });
 
     if (catError) {
-      console.error("Category fetch error:", catError);
-      return;
-    }
+  console.log("Category fetch error message:", catError.message);
+  console.log("Category fetch error code:", catError.code);
+  console.log("Category fetch error details:", catError.details);
+  console.log("Category fetch error hint:", catError.hint);
+  return;
+}
 
     if (catRows) {
       setCategories(catRows);

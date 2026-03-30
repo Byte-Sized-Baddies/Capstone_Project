@@ -1,116 +1,111 @@
+// app/settings/page.tsx
 "use client";
-import React, { useEffect, useState, useRef } from "react";
-import Image from "next/image";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
-const LIGHT_PINK = "#ffd6e8";
-const presetCategories = ["School", "Work", "Personal", "Chores", "Fitness", "Other"];
+const darkTheme = {
+  bg: "#111113", surface: "#18181b", surfaceHover: "#27272a",
+  border: "#27272a", borderStrong: "#3f3f46", text: "#fafafa",
+  textMuted: "#a1a1aa", textDim: "#71717a", accent: "#FFC107",
+  accentText: "#18181b", danger: "#ef4444", success: "#22c55e", inputBg: "#27272a",
+};
+const lightTheme = {
+  bg: "#fffaf3", surface: "#ffffff", surfaceHover: "#fff8e6",
+  border: "#f5e99f", borderStrong: "#e6d870", text: "#1a1a1a",
+  textMuted: "#6b6b6b", textDim: "#9a9a9a", accent: "#f5c800",
+  accentText: "#1a1a1a", danger: "#dc2626", success: "#16a34a", inputBg: "#fffdf2",
+};
 
 type Category = { id: number; name: string };
+type Folder = { id: number; name: string; owner: string; collaborators: string[]; created: number; };
 
 export default function SettingsPage() {
   const router = useRouter();
+  const [isDark, setIsDark] = useState(true);
+  const t = isDark ? darkTheme : lightTheme;
 
-  // Auth state
   const [authReady, setAuthReady] = useState(false);
-
+  const [userId, setUserId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("User");
-
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
-  const [invites, setInvites] = useState<string[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [notifStatus, setNotifStatus] = useState("default");
 
-  const searchRef = useRef<HTMLInputElement>(null);
-  const [rawSearch, setRawSearch] = useState("");
+  useEffect(() => { const saved = localStorage.getItem("theme"); if (saved) setIsDark(saved === "dark"); }, []);
+  const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
 
-  const categoryList = [...presetCategories, ...customCategories.map((c) => c.name)];
-
-  // ─── Session Check ────────────────────────────────────────────────────────
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session) {
-        router.push("/login");
-        return;
-      }
+      if (error || !data.session) { router.push("/login"); return; }
       const user = data.session.user;
-
-      // Wipe stale cache if a different user logged in
-      const cachedEmail = localStorage.getItem("userEmail");
-      if (cachedEmail && cachedEmail !== user.email) {
-        localStorage.removeItem("tasks");
-        localStorage.removeItem("folders");
-        localStorage.removeItem("categories");
-        localStorage.removeItem("avatar");
-        localStorage.removeItem("displayName");
-        setAvatarDataUrl(null);
-        setDisplayName(user.user_metadata?.full_name || user.email?.split("@")[0] || "User");
-      }
-      localStorage.setItem("userEmail", user.email ?? "");
-      setAuthReady(true); // ✅ auth confirmed
+      setUserId(user.id);
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
+      setDisplayName(name);
+      localStorage.setItem("displayName", name);
+      setAuthReady(true);
     };
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      checkSession();
-    });
-
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => checkSession());
     checkSession();
     return () => { authListener.subscription.unsubscribe(); };
   }, [router]);
 
-  // ─── Load from storage (only after auth) ─────────────────────────────────
   useEffect(() => {
-    if (!authReady) return; // ✅ gate
-
+    if (!authReady) return;
     const a = localStorage.getItem("avatar");
     const n = localStorage.getItem("displayName");
-    const i = localStorage.getItem("invites");
-
     if (a) setAvatarDataUrl(a);
     if (n) setDisplayName(n);
-    if (i) { try { setInvites(JSON.parse(i)); } catch {} }
-
-    if (typeof Notification !== "undefined") {
-      setNotifStatus(Notification.permission);
-    }
+    if (typeof Notification !== "undefined") setNotifStatus(Notification.permission);
   }, [authReady]);
 
-  // ─── Persist ──────────────────────────────────────────────────────────────
   useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
 
-  // ─── Load categories from Supabase ────────────────────────────────────────
   useEffect(() => {
     if (!authReady) return;
-
     const loadCategories = async () => {
-      const { data: userData, error: userError } = await supabase.auth.getUser();
+      const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
-      if (userError || !user) return;
-
-      const { data, error } = await supabase
-        .from("categories_v2")
-        .select("id, name")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true });
-
-      if (error) { console.error("Failed to load categories:", error); return; }
-      setCustomCategories(data ?? []);
+      if (!user) return;
+      const { data, error } = await supabase.from("categories_v2").select("id, name").eq("user_id", user.id).order("id", { ascending: true });
+      if (!error) setCustomCategories(data ?? []);
     };
-
     loadCategories();
   }, [authReady]);
 
-  // ─── Logout ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!authReady) return;
+    const loadData = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) return;
+
+      // Load tasks (just for folder counts)
+      const { data: taskData } = await supabase.from("tasks_v2").select("id, folder_id").eq("user_id", user.id);
+      setTasks(taskData ?? []);
+
+      // Load folders
+      const { data: ownedRows } = await supabase.from("folders").select("id, user_id, name, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
+      const { data: memberRows } = await supabase.from("folder_members").select("folder_id").eq("user_id", user.id);
+      const sharedFolderIds = [...new Set((memberRows ?? []).map(r => r.folder_id))];
+      const ownedIds = new Set((ownedRows ?? []).map(r => r.id));
+      const onlySharedIds = sharedFolderIds.filter(id => !ownedIds.has(id));
+      let sharedRows: any[] = [];
+      if (onlySharedIds.length > 0) { const { data } = await supabase.from("folders").select("id, user_id, name, created_at").in("id", onlySharedIds); sharedRows = data ?? []; }
+      setFolders([...(ownedRows ?? []), ...sharedRows].map(row => ({ id: row.id, name: row.name, owner: row.user_id, collaborators: [], created: new Date(row.created_at).getTime() })));
+    };
+    loadData();
+  }, [authReady]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    ["tasks", "folders", "categories", "avatar", "displayName", "userEmail"].forEach((k) =>
-      localStorage.removeItem(k)
-    );
+    ["tasks", "folders", "categories", "avatar", "displayName", "userEmail"].forEach(k => localStorage.removeItem(k));
     router.push("/login");
   };
 
@@ -121,238 +116,211 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  const getInitials = (n = displayName) =>
-    n.split(" ").map((x) => x[0]).slice(0, 2).join("").toUpperCase();
+  const getInitials = (n = displayName) => n.split(" ").map(x => x[0]).slice(0, 2).join("").toUpperCase();
 
   const addCategory = async () => {
     const v = newCategory.trim();
     if (!v) return;
-    if (categoryList.includes(v)) return alert("Category already exists");
-
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (customCategories.find(c => c.name.toLowerCase() === v.toLowerCase())) return alert("Category already exists");
+    const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (userError || !user) { alert("You are not logged in. Please log in and try again."); return; }
-
-    const { data, error } = await supabase
-      .from("categories_v2")
-      .insert({ user_id: user.id, name: v })
-      .select("id, name")
-      .single();
-
-    if (error || !data) { console.error("Category insert failed:", error); alert(`Failed to create category: ${error?.message}`); return; }
-
-    setCustomCategories((prev) => [...prev, data]);
+    if (!user) { alert("You are not logged in."); return; }
+    const { data, error } = await supabase.from("categories_v2").insert({ user_id: user.id, name: v }).select("id, name").single();
+    if (error || !data) { alert(`Failed to create category: ${error?.message}`); return; }
+    setCustomCategories(prev => [...prev, data]);
     setNewCategory("");
   };
 
   const removeCategory = async (cat: Category) => {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
+    const { data: userData } = await supabase.auth.getUser();
     const user = userData?.user;
-    if (userError || !user) return;
-
+    if (!user) return;
     const { error } = await supabase.from("categories_v2").delete().eq("id", cat.id).eq("user_id", user.id);
-    if (error) { console.error("Category delete failed:", error); alert(`Failed to remove category: ${error.message}`); return; }
-
-    setCustomCategories((prev) => prev.filter((c) => c.id !== cat.id));
-  };
-
-  const removeInvite = (email: string) => {
-    const filtered = invites.filter((i) => i !== email);
-    setInvites(filtered);
-    localStorage.setItem("invites", JSON.stringify(filtered));
+    if (error) { alert(`Failed to remove category: ${error.message}`); return; }
+    setCustomCategories(prev => prev.filter(c => c.id !== cat.id));
   };
 
   const enableNotifications = () => {
-    Notification.requestPermission().then((p) => {
+    Notification.requestPermission().then(p => {
       setNotifStatus(p);
       if (p === "granted") new Notification("Notifications Enabled", { body: "You will now receive task reminders." });
     });
   };
 
-  const sendTestNotification = () => {
-    if (Notification.permission === "denied") return alert("Notifications are blocked in your browser settings.");
-    if (Notification.permission === "default") return enableNotifications();
-    new Notification("Test Notification", { body: "This is a test notification!" });
-  };
+  const inputStyle = { background: t.inputBg, color: t.text, border: `1px solid ${t.border}` };
 
   const inlineStyles = `
-    @keyframes slideIn { from { transform: translateX(-12px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    .animate-slide-in { animation: slideIn 260ms ease-out forwards; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'DM Sans', sans-serif; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .slide-up { animation: slideUp 0.35s ease-out forwards; }
+    .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
   `;
 
-  // ─── Loading screen ───────────────────────────────────────────────────────
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-5xl mb-4">🐝</div>
-          <div className="text-gray-500 text-sm font-medium">Loading your tasks...</div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: t.bg }}>
+        <div className="text-center"><div className="text-5xl mb-4">🐝</div><div className="text-sm font-medium" style={{ color: t.textDim }}>Loading your hive...</div></div>
       </div>
     );
   }
 
   return (
-    <main className={`min-h-screen bg-[#fafafa] p-6 text-[#1a1a1a] transition-all ${sidebarOpen ? "ml-80" : "ml-0"}`}>
+    <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease, color 0.3s ease" }}>
       <style>{inlineStyles}</style>
 
       {/* SIDEBAR */}
-      <aside
-        className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}
-        aria-hidden={!sidebarOpen}
-      >
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-extrabold">Do Bee</h2>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
-        </div>
-
-        {/* Avatar */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative">
-            {avatarDataUrl ? (
-              <Image src={avatarDataUrl} alt="User avatar" width={56} height={56} unoptimized className="w-14 h-14 rounded-full object-cover shadow" />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">{getInitials()}</div>
-            )}
-            <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 bg-white p-1 rounded-full border shadow cursor-pointer text-xs">✎</label>
-            <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
+      <aside className="fixed inset-y-0 left-0 z-50 w-72 flex flex-col transition-transform duration-300"
+        style={{ background: t.surface, borderRight: `1px solid ${t.border}`, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)" }}>
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2"><span className="text-2xl">🐝</span><span className="text-xl font-bold" style={{ color: t.accent }}>Do Bee</span></div>
+            <div className="flex items-center gap-2">
+              <button onClick={toggleTheme} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover }}>{isDark ? "☀️" : "🌙"}</button>
+              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>✕</button>
+            </div>
           </div>
+          <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
+            <div className="relative">
+              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
+                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
+              <label htmlFor="avatar-sidebar" className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer text-xs" style={{ background: t.border, color: t.textMuted }}>✎</label>
+              <input id="avatar-sidebar" type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
+            </div>
+            <div className="text-sm font-semibold" style={{ color: t.text }}>{displayName}</div>
+          </div>
+          <nav className="space-y-1 mb-8">
+            {[{ href: "/dashboard", label: "Dashboard", icon: "⊞", active: false }, { href: "/calendar", label: "Calendar", icon: "📅", active: false }, { href: "/statistics", label: "Statistics", icon: "📊", active: false }, { href: "/settings", label: "Settings", icon: "⚙️", active: true }].map(item => (
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
+                <span>{item.icon}</span><span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
+          {/* Folders */}
           <div>
-            <div className="text-sm font-medium">{displayName}</div>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="text-xs mt-1 border rounded px-2 py-1" />
+            <div className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: t.textDim }}>Folders</div>
+            <a href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1 text-sm" style={{ color: t.textDim }}>
+              <span>📂</span><span>All Tasks</span>
+              <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{tasks.length}</span>
+            </a>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {folders.map(folder => {
+                const isOwner = folder.owner === userId;
+                const taskCount = tasks.filter((tk: any) => tk.folder_id === folder.id).length;
+                return (
+                  <a key={folder.id} href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm" style={{ color: t.textDim }}>
+                    <span>{isOwner ? "📁" : "🤝"}</span>
+                    <span className="flex-1 truncate">{folder.name}</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{taskCount}</span>
+                  </a>
+                );
+              })}
+            </div>
           </div>
         </div>
-
-        {/* Navigation */}
-        <nav className="space-y-3 animate-slide-in mb-6">
-          <a href="/dashboard" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Dashboard</span>
-          </a>
-          <a href="/calendar" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Calendar</span>
-          </a>
-          <a href="/statistics" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Statistics</span>
-          </a>
-          <a href="/settings" className="flex items-center gap-3 bg-[#ffd6e8] px-4 py-3 rounded-xl shadow transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 013 9.11V8z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Settings</span>
-          </a>
-        </nav>
-
-        {/* Invites */}
-        <div className="mt-6">
-          <h4 className="text-sm font-medium mb-2">Invited</h4>
-          <ul className="text-xs text-[#1a1a1a] space-y-1 max-h-28 overflow-auto pr-2">
-            {invites.length === 0 && <li className="opacity-50">No invites yet</li>}
-            {invites.map((i) => <li key={i}>{i}</li>)}
-          </ul>
-        </div>
-
-        <div className="mt-auto pt-6 border-t border-yellow-200">
-          <button onClick={handleLogout} className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm">Logout</button>
+        <div className="p-6" style={{ borderTop: `1px solid ${t.border}` }}>
+          <button onClick={handleLogout} className="w-full py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Sign Out</button>
         </div>
       </aside>
 
-      {/* TOP BAR */}
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>
-            )}
-            <div className="relative">
-              <div className="flex items-center bg-white rounded-3xl shadow-sm px-3 py-2 border border-transparent focus-within:ring-2 focus-within:ring-[#f5e99f] transition">
-                <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2"><path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>
-                <input ref={searchRef} value={rawSearch} onChange={(e) => setRawSearch(e.target.value)} placeholder="Search tasks, descriptions, categories..." className="outline-none px-2 py-1 w-80 md:w-96 bg-transparent" />
-                {rawSearch && <button onClick={() => { setRawSearch(""); searchRef.current?.focus(); }} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
-              </div>
-            </div>
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 fade-in" onClick={() => setSidebarOpen(false)} />}
+
+      {/* HEADER */}
+      <header className="sticky top-0 z-30 px-6 py-4 flex items-center justify-between"
+        style={{ background: isDark ? "rgba(17,17,19,0.92)" : "rgba(255,250,243,0.92)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${t.border}` }}>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
+            <div className="text-lg font-bold" style={{ color: t.text }}>Settings</div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-[#1a1a1a] text-right">
-              <div className="font-semibold">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>{isDark ? "☀️" : "🌙"}</button>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden" style={{ background: t.accent, color: t.accentText }}>
+            {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-9 h-9 object-cover" /> : getInitials()}
+          </div>
+        </div>
+      </header>
+
+      <div className="p-6 max-w-3xl mx-auto space-y-5 slide-up">
+        {/* Profile */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Profile</div>
+          <div className="flex items-center gap-5">
+            <div className="relative flex-shrink-0">
+              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-20 h-20 rounded-full object-cover" /> :
+                <div className="w-20 h-20 rounded-full flex items-center justify-center text-xl font-bold" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
+              <label htmlFor="avatar-main" className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full flex items-center justify-center cursor-pointer text-xs shadow"
+                style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>✎</label>
+              <input id="avatar-main" type="file" accept="image/*" className="hidden" onChange={e => onAvatarUpload(e.target.files?.[0])} />
             </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
-              {avatarDataUrl ? <Image src={avatarDataUrl} alt="User avatar" width={32} height={32} unoptimized className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
+            <div className="flex-1">
+              <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: t.textDim }}>Display Name</label>
+              <input value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full px-4 py-3 rounded-xl outline-none text-sm" style={inputStyle} />
             </div>
           </div>
         </div>
 
-        {/* MAIN SETTINGS CONTENT */}
-        <div className="max-w-3xl mx-auto space-y-10">
-
-          {/* PROFILE */}
-          <section className="bg-white p-6 rounded-2xl shadow-md border border-[#ffd6e8]/30">
-            <h2 className="text-xl font-semibold mb-4">Profile</h2>
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                {avatarDataUrl ? (
-                  <Image src={avatarDataUrl} alt="User avatar" width={80} height={80} unoptimized className="h-20 w-20 rounded-full object-cover shadow" />
-                ) : (
-                  <div className="h-20 w-20 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center text-lg font-bold shadow">{getInitials()}</div>
-                )}
-                <label htmlFor="avatar-up" className="absolute -bottom-2 -right-2 p-2 rounded-full bg-white shadow cursor-pointer text-xs">✎</label>
-                <input id="avatar-up" type="file" accept="image/*" className="hidden" onChange={(e) => onAvatarUpload(e.target.files?.[0])} />
-              </div>
-              <div className="flex-1">
-                <label className="text-sm">Display Name</label>
-                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="w-full mt-1 border p-2 rounded-xl" />
-              </div>
+        {/* Appearance */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Appearance</div>
+          <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: t.surfaceHover }}>
+            <div>
+              <div className="text-sm font-semibold" style={{ color: t.text }}>{isDark ? "Dark Mode" : "Light Mode"}</div>
+              <div className="text-xs" style={{ color: t.textDim }}>{isDark ? "Easy on the eyes at night" : "Bright and cheerful"}</div>
             </div>
-          </section>
+            <button onClick={toggleTheme} className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+              style={{ background: t.accent, color: t.accentText }}>
+              {isDark ? "☀️ Light Mode" : "🌙 Dark Mode"}
+            </button>
+          </div>
+        </div>
 
-          {/* NOTIFICATIONS */}
-          <section className="bg-white p-6 rounded-2xl shadow-md border border-[#f5e99f]/40">
-            <h2 className="text-xl font-semibold mb-3">Notifications</h2>
-            <p className="text-sm mb-3">Enable notifications for reminders and task completion alerts.</p>
-            <div className="flex gap-3">
-              <button onClick={enableNotifications} className="px-4 py-2 rounded-xl bg-[#fff8c2]">
-                {notifStatus === "granted" ? "Enabled" : "Enable Notifications"}
-              </button>
-              <button onClick={sendTestNotification} className="px-4 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>Test Notification</button>
-            </div>
-            <div className="text-sm mt-3">Status: <b>{notifStatus}</b></div>
-          </section>
+        {/* Notifications */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Notifications</div>
+          <p className="text-sm mb-4" style={{ color: t.textMuted }}>Enable notifications for reminders and task completion alerts.</p>
+          <div className="flex gap-3">
+            <button onClick={enableNotifications} className="px-4 py-2.5 rounded-xl text-sm font-semibold"
+              style={{ background: notifStatus === "granted" ? t.success + "20" : t.surfaceHover, color: notifStatus === "granted" ? t.success : t.textMuted, border: `1px solid ${notifStatus === "granted" ? t.success + "40" : t.border}` }}>
+              {notifStatus === "granted" ? "✓ Enabled" : "Enable Notifications"}
+            </button>
+            <button onClick={() => { if (Notification.permission === "denied") alert("Notifications are blocked."); else if (Notification.permission === "default") enableNotifications(); else new Notification("Test Notification", { body: "This is a test notification!" }); }}
+              className="px-4 py-2.5 rounded-xl text-sm font-semibold" style={{ background: t.accent, color: t.accentText }}>Test</button>
+          </div>
+          <div className="text-xs mt-3" style={{ color: t.textDim }}>Status: <span style={{ color: t.textMuted }}>{notifStatus}</span></div>
+        </div>
 
-          {/* CUSTOM CATEGORIES */}
-          <section className="bg-white p-6 rounded-2xl shadow-md border border-[#ffd6e8]/30">
-            <h2 className="text-xl font-semibold mb-4">Custom Categories</h2>
-            <div className="flex gap-2 mb-4">
-              <input value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category" className="flex-1 border p-2 rounded-xl" />
-              <button onClick={addCategory} className="px-4 py-2 rounded-xl" style={{ background: LIGHT_PINK }}>Add</button>
-            </div>
-            <ul className="space-y-2">
-              {customCategories.length === 0 && <p className="text-sm">No custom categories yet.</p>}
-              {customCategories.map((cat) => (
-                <li key={cat.id} className="flex items-center justify-between bg-[#fff6f9] p-2 rounded-xl border">
-                  <span>{cat.name}</span>
-                  <button onClick={() => removeCategory(cat)} className="px-2 py-1 text-xs rounded-lg bg-red-100 hover:bg-red-200">Remove</button>
-                </li>
+        {/* Custom Categories */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Custom Categories</div>
+          <div className="flex gap-2 mb-4">
+            <input value={newCategory} onChange={e => setNewCategory(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") addCategory(); }}
+              placeholder="New category name..." className="flex-1 px-4 py-2.5 rounded-xl outline-none text-sm" style={inputStyle} />
+            <button onClick={addCategory} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: t.accent, color: t.accentText }}>Add</button>
+          </div>
+          {customCategories.length === 0 ? (
+            <p className="text-sm py-4 text-center" style={{ color: t.textDim }}>No custom categories yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {customCategories.map(cat => (
+                <div key={cat.id} className="flex items-center justify-between p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ background: t.accent }} />
+                    <span className="text-sm font-medium" style={{ color: t.text }}>{cat.name}</span>
+                  </div>
+                  <button onClick={() => removeCategory(cat)} className="text-xs px-3 py-1 rounded-lg"
+                    style={{ background: t.danger + "20", color: t.danger }}>Remove</button>
+                </div>
               ))}
-            </ul>
-          </section>
-
-          {/* INVITES */}
-          <section className="bg-white p-6 rounded-2xl shadow-md border border-[#f5e99f]/40">
-            <h2 className="text-xl font-semibold mb-4">Invited Users</h2>
-            {invites.length === 0 ? (
-              <p className="text-sm">No invites yet.</p>
-            ) : (
-              <ul className="space-y-2">
-                {invites.map((email) => (
-                  <li key={email} className="flex items-center justify-between bg-[#fffdf2] p-2 rounded-xl border">
-                    <span>{email}</span>
-                    <button onClick={() => removeInvite(email)} className="px-2 py-1 text-xs rounded-lg bg-red-100 hover:bg-red-200">Remove</button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+            </div>
+          )}
         </div>
       </div>
     </main>

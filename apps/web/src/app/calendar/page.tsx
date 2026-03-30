@@ -313,30 +313,6 @@ export default function CalendarPage() {
     );
   }
 
-  const SidebarFolders = () => (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Folders</span>
-      </div>
-      <a href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1 text-sm transition-colors" style={{ color: t.textDim }}>
-        <span>📂</span><span>All Tasks</span>
-        <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{tasks.length}</span>
-      </a>
-      <div className="space-y-1 max-h-48 overflow-y-auto">
-        {folders.map(folder => {
-          const isOwner = folder.owner === userId;
-          const taskCount = tasks.filter(tk => tk.folderId === folder.id).length;
-          return (
-            <a key={folder.id} href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors" style={{ color: t.textDim }}>
-              <span>{isOwner ? "📁" : "🤝"}</span>
-              <span className="flex-1 truncate">{folder.name}</span>
-              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{taskCount}</span>
-            </a>
-          );
-        })}
-      </div>
-    </div>
-  );
 
   return (
     <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease, color 0.3s ease" }}>
@@ -359,14 +335,21 @@ export default function CalendarPage() {
             <div className="text-sm font-semibold" style={{ color: t.text }}>{displayName}</div>
           </div>
           <nav className="space-y-1 mb-8">
-            {[{ href: "/dashboard", label: "Dashboard", icon: "⊞", active: false }, { href: "/calendar", label: "Calendar", icon: "📅", active: true }, { href: "/statistics", label: "Statistics", icon: "📊", active: false }, { href: "/settings", label: "Settings", icon: "⚙️", active: false }].map(item => (
+            {[
+              { href: "/dashboard", label: "Dashboard", icon: "⊞", active: false },
+              { href: "/calendar", label: "Calendar", icon: "📅", active: true },
+              { href: "/folders", label: "Folders", icon: "📁", active: false },
+              { href: "/statistics", label: "Statistics", icon: "📊", active: false },
+              { href: "/archive", label: "Archive", icon: "📦", active: false },
+              { href: "/timeblocking", label: "Time Block", icon: "⏱", active: false },
+              { href: "/settings", label: "Settings", icon: "⚙️", active: false },
+            ].map(item => (
               <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
                 <span>{item.icon}</span><span>{item.label}</span>
               </a>
             ))}
           </nav>
-          <SidebarFolders />
         </div>
         <div className="p-6" style={{ borderTop: `1px solid ${t.border}` }}>
           <button onClick={handleLogout} className="w-full py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Sign Out</button>

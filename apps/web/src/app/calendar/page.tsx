@@ -4,452 +4,472 @@ import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
-type Status = "not_started" | "in_progress";
-
-interface Task {
-  id: number;
-  text: string;
-  description: string;
-  due: string;
-  done: boolean;
-  status: Status;
-  created: number;
-  priority: "Low" | "Medium" | "High";
-  category: string;
-  folderId?: number | null;
-}
-
-type Folder = {
-  id: number;
-  name: string;
-  owner: string;
-  collaborators: string[];
-  created: number;
+const darkTheme = {
+  bg: "#111113", surface: "#18181b", surfaceHover: "#27272a",
+  border: "#27272a", borderStrong: "#3f3f46", text: "#fafafa",
+  textMuted: "#a1a1aa", textDim: "#71717a", accent: "#FFC107",
+  accentText: "#18181b", danger: "#ef4444", success: "#22c55e", inputBg: "#27272a",
+};
+const lightTheme = {
+  bg: "#fffaf3", surface: "#ffffff", surfaceHover: "#fff8e6",
+  border: "#f5e99f", borderStrong: "#e6d870", text: "#1a1a1a",
+  textMuted: "#6b6b6b", textDim: "#9a9a9a", accent: "#f5c800",
+  accentText: "#1a1a1a", danger: "#dc2626", success: "#16a34a", inputBg: "#fffdf2",
 };
 
-const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+type Status = "not_started" | "in_progress";
+interface Task {
+  id: number; text: string; description: string; due: string;
+  done: boolean; status: Status; created: number;
+  priority: "Low" | "Medium" | "High"; category: string;
+  categoryId: number | null; folderId?: number | null;
+}
+type Folder = { id: number; name: string; owner: string; collaborators: string[]; created: number; };
+
+const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const intToPriority = (v: number): "Low" | "Medium" | "High" => v === 2 ? "High" : v === 1 ? "Medium" : "Low";
 
 export default function CalendarPage() {
   const router = useRouter();
+  const [isDark, setIsDark] = useState(true);
+  const t = isDark ? darkTheme : lightTheme;
 
-  // Auth state
   const [authReady, setAuthReady] = useState(false);
-
-  // User state
-  const [userEmail, setUserEmail] = useState<string>("");
-  const [displayName, setDisplayName] = useState<string>("User");
+  const [userId, setUserId] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState("User");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
-
-  // Tasks & folders
   const [tasks, setTasks] = useState<Task[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
 
-  // Calendar state
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [view, setView] = useState<"month" | "week">("month");
-
-  // UI state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
 
-  // ─── Session Check ────────────────────────────────────────────────────────
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved) setIsDark(saved === "dark");
+  }, []);
+
+  const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
+
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session) {
-        router.push("/login");
-        return;
-      }
+      if (error || !data.session) { router.push("/login"); return; }
       const user = data.session.user;
-
-      // Wipe stale cache if a different user logged in
-      const cachedEmail = localStorage.getItem("userEmail");
-      if (cachedEmail && cachedEmail !== user.email) {
-        localStorage.removeItem("tasks");
-        localStorage.removeItem("folders");
-        localStorage.removeItem("categories");
-        localStorage.removeItem("avatar");
-        localStorage.removeItem("displayName");
-        setTasks([]);
-        setFolders([]);
-        setAvatarDataUrl(null);
-      }
-      localStorage.setItem("userEmail", user.email ?? "");
-
-      setUserEmail(user.email || "");
+      setUserId(user.id);
       const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       setDisplayName(name);
-      setAuthReady(true); // ✅ auth confirmed
+      setAuthReady(true);
     };
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
-      checkSession();
-    });
-
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => checkSession());
     checkSession();
-
-    return () => {
-      authListener.subscription.unsubscribe();
-    };
+    return () => { authListener.subscription.unsubscribe(); };
   }, [router]);
 
-  // ─── Load saved state (only after auth) ──────────────────────────────────
   useEffect(() => {
-    if (!authReady) return; // ✅ gate
-
-    const saved = localStorage.getItem("tasks");
-    const savedFolders = localStorage.getItem("folders");
-    const savedAvatar = localStorage.getItem("avatar");
-    const savedName = localStorage.getItem("displayName");
-
-    if (saved) { try { setTasks(JSON.parse(saved)); } catch { setTasks([]); } }
-    if (savedFolders) { try { setFolders(JSON.parse(savedFolders)); } catch { setFolders([]); } }
-    if (savedAvatar) setAvatarDataUrl(savedAvatar);
-    if (savedName) setDisplayName(savedName);
+    if (!authReady) return;
+    const a = localStorage.getItem("avatar");
+    const n = localStorage.getItem("displayName");
+    if (a) setAvatarDataUrl(a);
+    if (n) setDisplayName(n);
   }, [authReady]);
 
-  // ─── Logout ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!authReady) return;
+    const loadTasks = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) return;
+      const { data: catRows } = await supabase.from("categories_v2").select("id, name").eq("user_id", user.id);
+      const catMap = new Map((catRows ?? []).map(c => [c.id, c.name]));
+      const { data, error } = await supabase
+        .from("tasks_v2")
+        .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id")
+        .eq("user_id", user.id);
+      if (error) return;
+      setTasks((data ?? []).map(row => ({
+        id: row.id, text: row.title, description: row.description ?? "",
+        due: row.due_date ?? "No date", done: row.is_completed,
+        status: row.status as Status, created: new Date(row.created_at).getTime(),
+        priority: intToPriority(row.priority), category: catMap.get(row.category_id) ?? "Other",
+        categoryId: row.category_id, folderId: row.folder_id ?? null,
+      })));
+    };
+    loadTasks();
+  }, [authReady]);
+
+  useEffect(() => {
+    if (!authReady) return;
+    const loadFolders = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) return;
+      const { data: ownedRows } = await supabase.from("folders").select("id, user_id, name, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
+      const { data: memberRows } = await supabase.from("folder_members").select("folder_id").eq("user_id", user.id);
+      const sharedFolderIds = [...new Set((memberRows ?? []).map(r => r.folder_id))];
+      const ownedIds = new Set((ownedRows ?? []).map(r => r.id));
+      const onlySharedIds = sharedFolderIds.filter(id => !ownedIds.has(id));
+      let sharedRows: any[] = [];
+      if (onlySharedIds.length > 0) {
+        const { data } = await supabase.from("folders").select("id, user_id, name, created_at").in("id", onlySharedIds);
+        sharedRows = data ?? [];
+      }
+      const allRows = [...(ownedRows ?? []), ...sharedRows];
+      setFolders(allRows.map(row => ({ id: row.id, name: row.name, owner: row.user_id, collaborators: [], created: new Date(row.created_at).getTime() })));
+    };
+    loadFolders();
+  }, [authReady]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    localStorage.removeItem("tasks");
-    localStorage.removeItem("folders");
-    localStorage.removeItem("categories");
-    localStorage.removeItem("avatar");
-    localStorage.removeItem("displayName");
-    localStorage.removeItem("userEmail");
+    ["tasks", "folders", "categories", "avatar", "displayName", "userEmail"].forEach(k => localStorage.removeItem(k));
     router.push("/login");
   };
 
-  // ─── Calendar utilities ───────────────────────────────────────────────────
-  const getDaysInMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
-  };
-
-  const getFirstDayOfMonth = (date: Date) => {
-    return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
-  };
-
+  const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  const getFirstDayOfMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   const getWeekDates = (date: Date) => {
     const day = date.getDay();
     const sunday = new Date(date);
     sunday.setDate(date.getDate() - day);
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(sunday);
-      d.setDate(sunday.getDate() + i);
-      return d;
-    });
+    return Array.from({ length: 7 }, (_, i) => { const d = new Date(sunday); d.setDate(sunday.getDate() + i); return d; });
   };
-
-  const formatDate = (date: Date) => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, "0");
-    const day = String(date.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  };
-
-  const isSameDay = (d1: Date, d2: Date) =>
-    d1.getFullYear() === d2.getFullYear() &&
-    d1.getMonth() === d2.getMonth() &&
-    d1.getDate() === d2.getDate();
-
+  const formatDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const isSameDay = (d1: Date, d2: Date) => d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth() && d1.getDate() === d2.getDate();
   const isToday = (date: Date) => isSameDay(date, new Date());
+  const getTasksForDate = (date: Date) => tasks.filter(tk => tk.due === formatDate(date));
 
-  const getTasksForDate = (date: Date) => {
-    const dateStr = formatDate(date);
-    return tasks.filter((t) => t.due === dateStr);
+  const goToPrev = () => {
+    if (view === "month") setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    else { const d = new Date(currentDate); d.setDate(d.getDate() - 7); setCurrentDate(d); }
+  };
+  const goToNext = () => {
+    if (view === "month") setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    else { const d = new Date(currentDate); d.setDate(d.getDate() + 7); setCurrentDate(d); }
   };
 
-  // ─── Navigation ───────────────────────────────────────────────────────────
-  const goToPreviousMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  const goToNextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  const goToPreviousWeek = () => { const d = new Date(currentDate); d.setDate(d.getDate() - 7); setCurrentDate(d); };
-  const goToNextWeek = () => { const d = new Date(currentDate); d.setDate(d.getDate() + 7); setCurrentDate(d); };
-  const goToToday = () => setCurrentDate(new Date());
+  const getInitials = (name = displayName) => name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 
-  // ─── Month view ───────────────────────────────────────────────────────────
+  const priorityConfig = (priority: "Low" | "Medium" | "High") => isDark ? {
+    High: { bg: "#ef444430", text: "#f87171", dot: "#ef4444" },
+    Medium: { bg: "#FFC10730", text: "#FFC107", dot: "#FFC107" },
+    Low: { bg: "#22c55e30", text: "#4ade80", dot: "#22c55e" },
+  }[priority] : {
+    High: { bg: "#fee2e2", text: "#b91c1c", dot: "#ef4444" },
+    Medium: { bg: "#fef9c3", text: "#a16207", dot: "#eab308" },
+    Low: { bg: "#dcfce7", text: "#15803d", dot: "#22c55e" },
+  }[priority];
+
   const renderMonthView = () => {
     const daysInMonth = getDaysInMonth(currentDate);
     const firstDay = getFirstDayOfMonth(currentDate);
     const days: { date: Date; isCurrentMonth: boolean }[] = [];
-
     const prevMonthDays = getDaysInMonth(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-    for (let i = firstDay - 1; i >= 0; i--) {
-      days.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, prevMonthDays - i), isCurrentMonth: false });
-    }
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth(), i), isCurrentMonth: true });
-    }
-    for (let i = 1; i <= 42 - days.length; i++) {
-      days.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i), isCurrentMonth: false });
-    }
+    for (let i = firstDay - 1; i >= 0; i--) days.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, prevMonthDays - i), isCurrentMonth: false });
+    for (let i = 1; i <= daysInMonth; i++) days.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth(), i), isCurrentMonth: true });
+    for (let i = 1; i <= 42 - days.length; i++) days.push({ date: new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, i), isCurrentMonth: false });
 
     return (
-      <div className="grid grid-cols-7 gap-px bg-gray-200 border border-gray-200 rounded-lg overflow-hidden">
-        {DAYS.map((day) => (
-          <div key={day} className="bg-white p-3 text-center font-semibold text-sm text-gray-700">{day}</div>
-        ))}
-        {days.map((day, idx) => {
-          const dayTasks = getTasksForDate(day.date);
-          const isCurrentDay = isToday(day.date);
-          return (
-            <div
-              key={idx}
-              className={`bg-white min-h-[120px] p-2 cursor-pointer hover:bg-gray-50 transition ${!day.isCurrentMonth ? "opacity-40" : ""} ${isCurrentDay ? "ring-2 ring-blue-500 ring-inset" : ""}`}
-              onClick={() => { setSelectedDate(day.date); setShowTaskModal(true); }}
-            >
-              <div className={`text-sm font-medium mb-1 ${isCurrentDay ? "text-blue-600 font-bold" : "text-gray-700"}`}>
-                {day.date.getDate()}
-              </div>
-              <div className="space-y-1">
-                {dayTasks.slice(0, 3).map((task) => (
-                  <div
-                    key={task.id}
-                    className={`text-xs p-1 rounded truncate ${task.done ? "bg-gray-100 text-gray-500 line-through" : task.priority === "High" ? "bg-red-100 text-red-700" : task.priority === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`}
-                    onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setShowTaskModal(true); }}
-                  >
-                    {task.text}
-                  </div>
-                ))}
-                {dayTasks.length > 3 && <div className="text-xs text-gray-500 pl-1">+{dayTasks.length - 3} more</div>}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    );
-  };
-
-  // ─── Week view ────────────────────────────────────────────────────────────
-  const renderWeekView = () => {
-    const weekDates = getWeekDates(currentDate);
-    const hours = Array.from({ length: 24 }, (_, i) => i);
-
-    return (
-      <div className="flex flex-col border border-gray-200 rounded-lg overflow-hidden">
-        <div className="grid grid-cols-8 bg-white border-b border-gray-200">
-          <div className="p-3" />
-          {weekDates.map((date, idx) => {
-            const isCurrentDay = isToday(date);
+      <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${t.border}` }}>
+        <div className="grid grid-cols-7" style={{ borderBottom: `1px solid ${t.border}` }}>
+          {DAYS.map(day => (
+            <div key={day} className="py-3 text-center text-xs font-semibold uppercase tracking-wider"
+              style={{ background: t.surface, color: t.textDim }}>{day}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {days.map((day, idx) => {
+            const dayTasks = getTasksForDate(day.date);
+            const today = isToday(day.date);
             return (
-              <div key={idx} className={`p-3 text-center ${isCurrentDay ? "bg-blue-50" : ""}`}>
-                <div className="text-xs text-gray-500">{DAYS[date.getDay()]}</div>
-                <div className={`text-lg font-semibold ${isCurrentDay ? "text-blue-600" : "text-gray-700"}`}>{date.getDate()}</div>
+              <div key={idx} className="min-h-[110px] p-2 cursor-pointer transition-colors"
+                style={{ background: today ? `${t.accent}15` : t.surface, borderRight: idx % 7 !== 6 ? `1px solid ${t.border}` : "none", borderBottom: `1px solid ${t.border}`, opacity: day.isCurrentMonth ? 1 : 0.35 }}
+                onClick={() => { setSelectedDate(day.date); setSelectedTask(null); setShowTaskModal(true); }}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full"
+                    style={{ background: today ? t.accent : "transparent", color: today ? t.accentText : t.text }}>
+                    {day.date.getDate()}
+                  </span>
+                  {dayTasks.length > 0 && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: t.accent + "30", color: t.accent }}>{dayTasks.length}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  {dayTasks.slice(0, 2).map(task => {
+                    const pc = priorityConfig(task.priority);
+                    return (
+                      <div key={task.id} className="text-xs px-2 py-1 rounded-lg truncate font-medium"
+                        style={{ background: pc.bg, color: pc.text }}
+                        onClick={e => { e.stopPropagation(); setSelectedTask(task); setShowTaskModal(true); }}>
+                        {task.text}
+                      </div>
+                    );
+                  })}
+                  {dayTasks.length > 2 && <div className="text-xs pl-1" style={{ color: t.textDim }}>+{dayTasks.length - 2} more</div>}
+                </div>
               </div>
             );
           })}
         </div>
-        <div className="overflow-y-auto max-h-[600px]">
-          {hours.map((hour) => (
-            <div key={hour} className="grid grid-cols-8 border-b border-gray-100">
-              <div className="p-2 text-xs text-gray-500 text-right pr-4">
-                {hour === 0 ? "12 AM" : hour < 12 ? `${hour} AM` : hour === 12 ? "12 PM" : `${hour - 12} PM`}
-              </div>
-              {weekDates.map((date, idx) => {
-                const dayTasks = getTasksForDate(date);
-                const isCurrentDay = isToday(date);
-                return (
-                  <div
-                    key={idx}
-                    className={`min-h-[60px] p-1 cursor-pointer hover:bg-gray-50 transition ${isCurrentDay ? "bg-blue-50/30" : "bg-white"}`}
-                    onClick={() => { setSelectedDate(date); setShowTaskModal(true); }}
-                  >
-                    {hour === 9 && dayTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={`text-xs p-1 mb-1 rounded truncate ${task.done ? "bg-gray-100 text-gray-500 line-through" : task.priority === "High" ? "bg-red-100 text-red-700" : task.priority === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`}
-                        onClick={(e) => { e.stopPropagation(); setSelectedTask(task); setShowTaskModal(true); }}
-                      >
-                        {task.text}
-                      </div>
-                    ))}
+      </div>
+    );
+  };
+
+  // ─── Improved Week View — task cards per day, no hour rows ───────────────
+  const renderWeekView = () => {
+    const weekDates = getWeekDates(currentDate);
+    return (
+      <div className="rounded-2xl overflow-hidden" style={{ border: `1px solid ${t.border}` }}>
+        {/* Day headers */}
+        <div className="grid grid-cols-7" style={{ borderBottom: `1px solid ${t.border}`, background: t.surface }}>
+          {weekDates.map((date, idx) => {
+            const today = isToday(date);
+            const dayTasks = getTasksForDate(date);
+            return (
+              <div key={idx} className="py-4 px-2 text-center" style={{ borderRight: idx < 6 ? `1px solid ${t.border}` : "none" }}>
+                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: t.textDim }}>{DAYS[date.getDay()]}</div>
+                <div className="text-2xl font-bold w-10 h-10 mx-auto flex items-center justify-center rounded-full mb-2"
+                  style={{ background: today ? t.accent : "transparent", color: today ? t.accentText : t.text }}>
+                  {date.getDate()}
+                </div>
+                {dayTasks.length > 0 && (
+                  <div className="text-xs font-medium px-2 py-0.5 rounded-full mx-auto w-fit"
+                    style={{ background: t.accent + "25", color: t.accent }}>
+                    {dayTasks.length} task{dayTasks.length !== 1 ? "s" : ""}
                   </div>
-                );
-              })}
-            </div>
-          ))}
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Task cards per day — no hour rows */}
+        <div className="grid grid-cols-7" style={{ minHeight: 400 }}>
+          {weekDates.map((date, idx) => {
+            const dayTasks = getTasksForDate(date);
+            const today = isToday(date);
+            return (
+              <div key={idx} className="p-2 cursor-pointer transition-colors"
+                style={{ background: today ? `${t.accent}08` : t.surface, borderRight: idx < 6 ? `1px solid ${t.border}` : "none", minHeight: 400 }}
+                onClick={() => { setSelectedDate(date); setSelectedTask(null); setShowTaskModal(true); }}>
+                {dayTasks.length === 0 ? (
+                  <div className="h-full flex items-center justify-center pt-8">
+                    <div className="text-xl" style={{ color: t.borderStrong }}>—</div>
+                  </div>
+                ) : (
+                  <div className="space-y-2 pt-1">
+                    {dayTasks.map(task => {
+                      const pc = priorityConfig(task.priority);
+                      return (
+                        <div key={task.id} className="p-2 rounded-xl cursor-pointer transition-all hover:opacity-80"
+                          style={{ background: pc.bg, border: `1px solid ${pc.dot}30` }}
+                          onClick={e => { e.stopPropagation(); setSelectedTask(task); setShowTaskModal(true); }}>
+                          <div className="flex items-start gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0" style={{ background: pc.dot }} />
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold leading-tight truncate"
+                                style={{ color: pc.text, textDecoration: task.done ? "line-through" : "none", opacity: task.done ? 0.6 : 1 }}>
+                                {task.text}
+                              </div>
+                              <div className="text-xs mt-0.5 truncate" style={{ color: pc.text, opacity: 0.7 }}>{task.category}</div>
+                              {task.done && <div className="text-xs mt-0.5" style={{ color: t.success }}>✓ Done</div>}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
     );
   };
 
-  const toggleDone = (id: number) => {
-    const updated = tasks.map((t) => t.id === id ? { ...t, done: !t.done } : t);
-    setTasks(updated);
-    localStorage.setItem("tasks", JSON.stringify(updated));
-  };
-
-  const getInitials = (name = displayName) =>
-    name.split(" ").map((n) => n[0]).slice(0, 2).join("").toUpperCase();
-
   const inlineStyles = `
-    @keyframes slideIn { from { transform: translateX(-12px); opacity: 0 } to { transform: translateX(0); opacity: 1 } }
-    .animate-slide-in { animation: slideIn 260ms ease-out forwards; }
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'DM Sans', sans-serif; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+    .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+    .modal-in { animation: modalIn 0.22s ease-out forwards; }
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
   `;
 
-  // ─── Loading screen ───────────────────────────────────────────────────────
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-5xl mb-4">🐝</div>
-          <div className="text-gray-500 text-sm font-medium">Loading your tasks...</div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: t.bg }}>
+        <div className="text-center"><div className="text-5xl mb-4">🐝</div><div className="text-sm font-medium" style={{ color: t.textDim }}>Loading your hive...</div></div>
       </div>
     );
   }
 
+  const SidebarFolders = () => (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Folders</span>
+      </div>
+      <a href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl mb-1 text-sm transition-colors" style={{ color: t.textDim }}>
+        <span>📂</span><span>All Tasks</span>
+        <span className="ml-auto text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{tasks.length}</span>
+      </a>
+      <div className="space-y-1 max-h-48 overflow-y-auto">
+        {folders.map(folder => {
+          const isOwner = folder.owner === userId;
+          const taskCount = tasks.filter(tk => tk.folderId === folder.id).length;
+          return (
+            <a key={folder.id} href="/dashboard" className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-colors" style={{ color: t.textDim }}>
+              <span>{isOwner ? "📁" : "🤝"}</span>
+              <span className="flex-1 truncate">{folder.name}</span>
+              <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.border, color: t.textMuted }}>{taskCount}</span>
+            </a>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <main className={`min-h-screen bg-[#fafafa] p-6 relative text-[#1a1a1a] transition-all duration-300 ${sidebarOpen ? "ml-80" : "ml-0"}`}>
+    <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease, color 0.3s ease" }}>
       <style>{inlineStyles}</style>
 
       {/* SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-extrabold">Do Bee</h2>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
-        </div>
-
-        <div className="flex items-center gap-3 mb-4">
-          <div className="relative">
-            {avatarDataUrl ? (
-              <img src={avatarDataUrl} alt="avatar" className="w-14 h-14 rounded-full object-cover shadow" />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold text-sm shadow">{getInitials()}</div>
-            )}
+      <aside className="fixed inset-y-0 left-0 z-50 w-72 flex flex-col transition-transform duration-300"
+        style={{ background: t.surface, borderRight: `1px solid ${t.border}`, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)" }}>
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2"><span className="text-2xl">🐝</span><span className="text-xl font-bold" style={{ color: t.accent }}>Do Bee</span></div>
+            <div className="flex items-center gap-2">
+              <button onClick={toggleTheme} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover }}>{isDark ? "☀️" : "🌙"}</button>
+              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>✕</button>
+            </div>
           </div>
-          <div className="text-sm font-medium">{displayName}</div>
-        </div>
-
-        <nav className="space-y-3 animate-slide-in mb-6">
-          <a href="/dashboard" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Dashboard</span>
-          </a>
-          <a href="/calendar" className="flex items-center gap-3 bg-[#ffd6e8] px-4 py-3 rounded-xl shadow transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Calendar</span>
-          </a>
-          <a href="/statistics" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Statistics</span>
-          </a>
-          <a href="/settings" className="flex items-center gap-3 bg-white px-4 py-3 rounded-xl shadow hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 003 9.11V8z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Settings</span>
-          </a>
-        </nav>
-
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <h4 className="text-sm font-semibold">Folders</h4>
+          <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
+            {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
+            <div className="text-sm font-semibold" style={{ color: t.text }}>{displayName}</div>
           </div>
-          <button onClick={() => router.push("/dashboard")} className="w-full text-left px-3 py-2 rounded-lg mb-2 transition hover:bg-white">
-            📂 All Tasks ({tasks.length})
-          </button>
-          <div className="space-y-2 max-h-64 overflow-y-auto">
-            {folders.map((folder) => (
-              <div key={folder.id} className="px-3 py-2 rounded-lg transition hover:bg-white">
-                <button onClick={() => router.push("/dashboard")} className="flex-1 text-left text-sm w-full">
-                  <span className="font-medium">📁 {folder.name}</span>
-                  <span className="text-xs text-gray-500 ml-2">({tasks.filter((t) => t.folderId === folder.id).length})</span>
-                </button>
-              </div>
+          <nav className="space-y-1 mb-8">
+            {[{ href: "/dashboard", label: "Dashboard", icon: "⊞", active: false }, { href: "/calendar", label: "Calendar", icon: "📅", active: true }, { href: "/statistics", label: "Statistics", icon: "📊", active: false }, { href: "/settings", label: "Settings", icon: "⚙️", active: false }].map(item => (
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
+                <span>{item.icon}</span><span>{item.label}</span>
+              </a>
             ))}
-          </div>
+          </nav>
+          <SidebarFolders />
         </div>
-
-        <div className="mt-auto pt-6 border-t border-yellow-200">
-          <button onClick={handleLogout} className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm">Logout</button>
+        <div className="p-6" style={{ borderTop: `1px solid ${t.border}` }}>
+          <button onClick={handleLogout} className="w-full py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Sign Out</button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>
-            )}
-            <h1 className="text-3xl font-bold">Calendar</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-gray-600 text-right">
-              <div className="font-semibold">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", day: "2-digit", month: "long" })}</div>
-            </div>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center shadow">
-              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar-mini" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
-            </div>
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 fade-in" onClick={() => setSidebarOpen(false)} />}
+
+      {/* HEADER */}
+      <header className="sticky top-0 z-30 px-6 py-4 flex items-center justify-between"
+        style={{ background: isDark ? "rgba(17,17,19,0.92)" : "rgba(255,250,243,0.92)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${t.border}` }}>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
+            <div className="text-lg font-bold" style={{ color: t.text }}>Calendar</div>
           </div>
         </div>
-
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <button onClick={goToToday} className="px-4 py-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition">Today</button>
-            <div className="flex items-center gap-2">
-              <button onClick={view === "month" ? goToPreviousMonth : goToPreviousWeek} className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition">←</button>
-              <button onClick={view === "month" ? goToNextMonth : goToNextWeek} className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition">→</button>
-            </div>
-            <h2 className="text-xl font-semibold">{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
-          </div>
-          <div className="flex items-center gap-2 bg-white rounded-lg border border-gray-300 p-1">
-            <button onClick={() => setView("month")} className={`px-4 py-2 rounded-lg transition ${view === "month" ? "bg-[#f5e99f] font-medium" : "hover:bg-gray-50"}`}>Month</button>
-            <button onClick={() => setView("week")} className={`px-4 py-2 rounded-lg transition ${view === "week" ? "bg-[#f5e99f] font-medium" : "hover:bg-gray-50"}`}>Week</button>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>{isDark ? "☀️" : "🌙"}</button>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden" style={{ background: t.accent, color: t.accentText }}>
+            {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-9 h-9 object-cover" /> : getInitials()}
           </div>
         </div>
+      </header>
 
+      <div className="p-6 max-w-7xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 rounded-xl text-sm font-medium" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>Today</button>
+            <div className="flex items-center gap-1">
+              <button onClick={goToPrev} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>←</button>
+              <button onClick={goToNext} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>→</button>
+            </div>
+            <h2 className="text-xl font-bold" style={{ color: t.text }}>{MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}</h2>
+          </div>
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+            {(["month", "week"] as const).map(v => (
+              <button key={v} onClick={() => setView(v)} className="px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize"
+                style={{ background: view === v ? t.accent : "transparent", color: view === v ? t.accentText : t.textMuted }}>{v}</button>
+            ))}
+          </div>
+        </div>
         {view === "month" ? renderMonthView() : renderWeekView()}
       </div>
 
-      {/* Task Detail Modal */}
+      {/* Task Modal */}
       {showTaskModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => { setShowTaskModal(false); setSelectedTask(null); setSelectedDate(null); }} />
-          <div className="relative bg-white w-full max-w-md rounded-2xl p-6 shadow-2xl border border-[#f5e99f]/30">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">{selectedDate ? formatDate(selectedDate) : "Tasks"}</h2>
-              <button onClick={() => { setShowTaskModal(false); setSelectedTask(null); setSelectedDate(null); }} className="text-gray-500 hover:text-gray-700">✕</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/70 fade-in" onClick={() => { setShowTaskModal(false); setSelectedTask(null); setSelectedDate(null); }} />
+          <div className="relative w-full max-w-md rounded-3xl p-6 modal-in" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>{selectedDate ? formatDate(selectedDate) : "Tasks"}</div>
+                <h2 className="text-lg font-bold" style={{ color: t.text }}>{selectedTask ? selectedTask.text : `${getTasksForDate(selectedDate!).length} Tasks`}</h2>
+              </div>
+              <button onClick={() => { setShowTaskModal(false); setSelectedTask(null); setSelectedDate(null); }}
+                className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>✕</button>
             </div>
-
             {selectedTask ? (
               <div className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-xl mb-2">{selectedTask.text}</h3>
-                  <p className="text-sm text-gray-600">{selectedTask.description}</p>
+                {selectedTask.description && <p className="text-sm" style={{ color: t.textMuted }}>{selectedTask.description}</p>}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {(() => { const pc = priorityConfig(selectedTask.priority); return (
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: pc.bg, color: pc.text }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: pc.dot }} />{selectedTask.priority}
+                    </span>
+                  ); })()}
+                  <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.accent }}>{selectedTask.category}</span>
+                  {selectedTask.due !== "No date" && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>📅 {selectedTask.due}</span>}
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${selectedTask.priority === "High" ? "bg-red-100 text-red-700" : selectedTask.priority === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`}>{selectedTask.priority}</span>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">{selectedTask.category}</span>
+                <div className="flex items-center gap-2 pt-3" style={{ borderTop: `1px solid ${t.border}` }}>
+                  <div className="w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0"
+                    style={{ borderColor: selectedTask.done ? t.accent : t.borderStrong, background: selectedTask.done ? t.accent : "transparent" }}>
+                    {selectedTask.done && <svg width="10" height="10" viewBox="0 0 10 10"><path d="M2 5l2 2 4-4" stroke={t.accentText} strokeWidth="2" strokeLinecap="round" fill="none" /></svg>}
+                  </div>
+                  <span className="text-sm" style={{ color: t.textMuted }}>{selectedTask.done ? "Completed" : selectedTask.status === "in_progress" ? "In Progress" : "Not Started"}</span>
                 </div>
-                <div className="flex items-center gap-2 pt-4 border-t">
-                  <input type="checkbox" checked={selectedTask.done} onChange={() => { toggleDone(selectedTask.id); setSelectedTask({ ...selectedTask, done: !selectedTask.done }); }} className="w-5 h-5 accent-[#f5e99f]" />
-                  <span className="text-sm">Mark as {selectedTask.done ? "incomplete" : "complete"}</span>
-                </div>
-                <button onClick={() => { setShowTaskModal(false); setSelectedTask(null); router.push("/dashboard"); }} className="w-full py-2 rounded-lg bg-[#f5e99f] hover:bg-[#ffe680] transition">Go to Dashboard</button>
+                <button onClick={() => { setShowTaskModal(false); router.push("/dashboard"); }} className="w-full py-3 rounded-xl text-sm font-bold mt-2" style={{ background: t.accent, color: t.accentText }}>Go to Dashboard</button>
               </div>
             ) : selectedDate ? (
-              <div className="space-y-3">
+              <div>
                 {getTasksForDate(selectedDate).length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">No tasks for this day</p>
+                  <div className="py-10 text-center"><div className="text-3xl mb-3">🐝</div><p className="text-sm" style={{ color: t.textDim }}>No tasks for this day</p></div>
                 ) : (
-                  <div className="space-y-2">
-                    {getTasksForDate(selectedDate).map((task) => (
-                      <div key={task.id} className="p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition" onClick={() => setSelectedTask(task)}>
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <h4 className={`font-medium ${task.done ? "line-through text-gray-500" : ""}`}>{task.text}</h4>
-                            <p className="text-xs text-gray-500 mt-1">{task.description}</p>
+                  <div className="space-y-2 max-h-72 overflow-y-auto">
+                    {getTasksForDate(selectedDate).map(task => {
+                      const pc = priorityConfig(task.priority);
+                      return (
+                        <div key={task.id} className="p-3 rounded-xl cursor-pointer" style={{ background: t.surfaceHover }} onClick={() => setSelectedTask(task)}>
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-medium text-sm truncate" style={{ color: t.text, textDecoration: task.done ? "line-through" : "none", opacity: task.done ? 0.5 : 1 }}>{task.text}</h4>
+                              {task.description && <p className="text-xs truncate mt-0.5" style={{ color: t.textDim }}>{task.description}</p>}
+                            </div>
+                            <span className="text-xs px-2 py-0.5 rounded-full flex-shrink-0" style={{ background: pc.bg, color: pc.text }}>{task.priority}</span>
                           </div>
-                          <span className={`px-2 py-1 rounded text-xs ${task.priority === "High" ? "bg-red-100 text-red-700" : task.priority === "Medium" ? "bg-yellow-100 text-yellow-700" : "bg-blue-100 text-blue-700"}`}>{task.priority}</span>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
-                <button onClick={() => { setShowTaskModal(false); setSelectedDate(null); router.push("/dashboard"); }} className="w-full py-2 rounded-lg bg-[#f5e99f] hover:bg-[#ffe680] transition mt-4">Add New Task</button>
+                <button onClick={() => { setShowTaskModal(false); router.push("/dashboard"); }} className="w-full py-3 rounded-xl text-sm font-bold mt-4" style={{ background: t.accent, color: t.accentText }}>Add Task on Dashboard</button>
               </div>
             ) : null}
           </div>

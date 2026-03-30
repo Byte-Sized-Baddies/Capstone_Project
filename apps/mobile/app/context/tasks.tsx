@@ -182,7 +182,17 @@ export function TasksProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    loadTasks();
+    let channel: ReturnType<typeof supabase.channel>;
+    loadTasks().then(() => {
+      supabase.auth.getUser().then(({ data }) => {
+        const user = data?.user;
+        if (!user) return;
+        channel = supabase.channel("mobile-tasks-realtime")
+          .on("postgres_changes", { event: "*", schema: "public", table: "tasks_v2", filter: `user_id=eq.${user.id}` }, () => loadTasks())
+          .subscribe();
+      });
+    });
+    return () => { if (channel) supabase.removeChannel(channel); };
   }, [loadTasks]);
 
   const addTask = useCallback(

@@ -2,6 +2,8 @@ import React, {
     createContext,
     useContext,
     useState,
+    useEffect,
+    useCallback,
     ReactNode,
 } from "react";
 import { supabase } from "../../lib/supabaseClient";
@@ -34,9 +36,39 @@ const DEFAULT_COLORS = ["#FACC15", "#4ADE80", "#60A5FA", "#FB7185", "#A855F7"];
 
 export function ProjectsProvider({ children }: { children: ReactNode }) {
     const [projects, setProjects] = useState<Project[]>([]);
-
-    // Start with grid view (no project selected)
     const [activeProjectId, setActiveProjectId] = useState<number | null>(null);
+
+    const loadProjects = useCallback(async () => {
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) return;
+        const { data, error: fetchError } = await supabase
+            .from("folders")
+            .select("id, name, color, created_at")
+            .eq("user_id", user.id)
+            .order("created_at", { ascending: false });
+        if (fetchError || !data) return;
+        setProjects(data.map(row => ({
+            id: row.id,
+            name: row.name,
+            color: row.color ?? DEFAULT_COLORS[0],
+            icon: "📁",
+            createdAt: row.created_at ?? new Date().toISOString(),
+        })));
+    }, []);
+
+    useEffect(() => {
+        let channel: ReturnType<typeof supabase.channel>;
+        loadProjects().then(() => {
+            supabase.auth.getUser().then(({ data }) => {
+                const user = data?.user;
+                if (!user) return;
+                channel = supabase.channel("mobile-folders-realtime")
+                    .on("postgres_changes", { event: "*", schema: "public", table: "folders", filter: `user_id=eq.${user.id}` }, () => loadProjects())
+                    .subscribe();
+            });
+        });
+        return () => { if (channel) supabase.removeChannel(channel); };
+    }, [loadProjects]);
 
     const createProject: ProjectsContextType["createProject"] = async (
         name,
@@ -62,22 +94,11 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
             color,
         };
 
-        let { data, error } = await supabase
-            .from("folder")
+        const { data, error } = await supabase
+            .from("folders")
             .insert(payload)
             .select("id, name, color, created_at")
             .single();
-
-        if (error?.code === "42P01") {
-            const fallbackResult = await supabase
-                .from("folders")
-                .insert(payload)
-                .select("id, name, color, created_at")
-                .single();
-
-            data = fallbackResult.data;
-            error = fallbackResult.error;
-        }
 
         if (error || !data) {
             console.error("Failed to create folder in Supabase:", error);
@@ -101,14 +122,23 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
         id: number,
         updates: { name?: string; color?: string; icon?: string }
     ) => {
-        setProjects((prev) =>
-            prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-        );
+        setProjects((prev) => prev.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+        const dbUpdates: Record<string, string> = {};
+        if (updates.name) dbUpdates.name = updates.name;
+        if (updates.color) dbUpdates.color = updates.color;
+        if (Object.keys(dbUpdates).length > 0) {
+            supabase.from("folders").update(dbUpdates).eq("id", id).then(({ error }) => {
+                if (error) console.error("Failed to update folder:", error);
+            });
+        }
     };
 
     const deleteProject = (id: number) => {
         setProjects((prev) => prev.filter((p) => p.id !== id));
         setActiveProjectId((current) => (current === id ? null : current));
+        supabase.from("folders").delete().eq("id", id).then(({ error }) => {
+            if (error) console.error("Failed to delete folder:", error);
+        });
     };
 
     const setActiveProject = (id: number | null) => {

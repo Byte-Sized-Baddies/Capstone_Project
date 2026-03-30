@@ -4,103 +4,104 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "../auth/supabaseClient";
 
-const LIGHT_PINK = "#ffd6e8";
+const darkTheme = {
+  bg: "#111113", surface: "#18181b", surfaceHover: "#27272a",
+  border: "#27272a", borderStrong: "#3f3f46", text: "#fafafa",
+  textMuted: "#a1a1aa", textDim: "#71717a", accent: "#FFC107",
+  accentText: "#18181b", danger: "#ef4444", success: "#22c55e", inputBg: "#27272a",
+};
+const lightTheme = {
+  bg: "#fffaf3", surface: "#ffffff", surfaceHover: "#fff8e6",
+  border: "#f5e99f", borderStrong: "#e6d870", text: "#1a1a1a",
+  textMuted: "#6b6b6b", textDim: "#9a9a9a", accent: "#f5c800",
+  accentText: "#1a1a1a", danger: "#dc2626", success: "#16a34a", inputBg: "#fffdf2",
+};
 
-function HoneycombLiquid({ percent }: { percent: number }) {
-  const size = 180;
-  const cx = size / 2;
-  const cy = size / 2;
-  const r = 78;
-  const points = Array.from({ length: 6 }, (_, i) => {
-    const angle = (Math.PI / 180) * (60 * i - 30);
-    return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)];
-  });
-  const polyPoints = points.map((p) => p.join(",")).join(" ");
-  const clipId = "hex-clip-stats";
+const NAV_ITEMS = [
+  { href: "/dashboard", label: "Dashboard", icon: "⊞", active: false },
+  { href: "/calendar", label: "Calendar", icon: "📅", active: false },
+  { href: "/folders", label: "Folders", icon: "📁", active: false },
+  { href: "/statistics", label: "Statistics", icon: "📊", active: true },
+  { href: "/archive", label: "Archive", icon: "📦", active: false },
+  { href: "/timeblocking", label: "Time Block", icon: "⏱", active: false },
+  { href: "/settings", label: "Settings", icon: "⚙️", active: false },
+];
+
+function HoneycombLiquid({ percent, accentColor }: { percent: number; accentColor: string }) {
+  const size = 180, cx = size / 2, cy = size / 2, r = 78;
+  const points = Array.from({ length: 6 }, (_, i) => { const angle = (Math.PI / 180) * (60 * i - 30); return [cx + r * Math.cos(angle), cy + r * Math.sin(angle)]; });
+  const polyPoints = points.map(p => p.join(",")).join(" ");
   const fillY = cy - r + r * 2 * (1 - percent / 100);
-
   return (
     <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <defs>
-        <clipPath id={clipId}>
-          <polygon points={polyPoints} />
-        </clipPath>
-      </defs>
-      <polygon points={polyPoints} fill="#fff6f9" stroke={LIGHT_PINK} strokeWidth="3" />
-      <rect x={cx - r} y={fillY} width={r * 2} height={r * 2} fill={LIGHT_PINK} opacity="0.9" clipPath={`url(#${clipId})`} style={{ transition: "y 0.8s ease" }} />
-      <polygon points={polyPoints} fill="none" stroke="#fff" strokeWidth="2" opacity="0.4" />
+      <defs><clipPath id="hex-clip"><polygon points={polyPoints} /></clipPath></defs>
+      <polygon points={polyPoints} fill={`${accentColor}15`} stroke={accentColor} strokeWidth="3" />
+      <rect x={cx - r} y={fillY} width={r * 2} height={r * 2} fill={accentColor} opacity="0.85" clipPath="url(#hex-clip)" style={{ transition: "y 0.8s ease" }} />
+      <polygon points={polyPoints} fill="none" stroke="#fff" strokeWidth="2" opacity="0.3" />
     </svg>
   );
 }
 
 export default function StatisticsPage() {
   const router = useRouter();
+  const [isDark, setIsDark] = useState(true);
+  const t = isDark ? darkTheme : lightTheme;
 
-  // Auth state
   const [authReady, setAuthReady] = useState(false);
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("User");
-  const [invites, setInvites] = useState<string[]>([]);
   const [tasks, setTasks] = useState<any[]>([]);
-  const [rawSearch, setRawSearch] = useState("");
   const [dailyGoal, setDailyGoal] = useState(5);
 
-  // ─── Session Check ────────────────────────────────────────────────────────
+  useEffect(() => { const saved = localStorage.getItem("theme"); if (saved) setIsDark(saved === "dark"); }, []);
+  const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
+
   useEffect(() => {
     const checkSession = async () => {
       const { data, error } = await supabase.auth.getSession();
       if (error || !data.session) { router.push("/login"); return; }
-
       const user = data.session.user;
-
-      // Wipe stale cache if a different user logged in
-      const cachedEmail = localStorage.getItem("userEmail");
-      if (cachedEmail && cachedEmail !== user.email) {
-        localStorage.removeItem("tasks");
-        localStorage.removeItem("folders");
-        localStorage.removeItem("categories");
-        localStorage.removeItem("avatar");
-        localStorage.removeItem("displayName");
-        setTasks([]);
-        setAvatarDataUrl(null);
-      }
-      localStorage.setItem("userEmail", user.email ?? "");
-
       const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       setDisplayName(name);
-      setAuthReady(true); // ✅ auth confirmed
+      setAuthReady(true);
     };
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => { checkSession(); });
+    const { data: authListener } = supabase.auth.onAuthStateChange(() => checkSession());
     checkSession();
     return () => { authListener.subscription.unsubscribe(); };
   }, [router]);
 
-  // ─── Load from storage (only after auth) ─────────────────────────────────
   useEffect(() => {
-    if (!authReady) return; // ✅ gate
-
+    if (!authReady) return;
     const a = localStorage.getItem("avatar");
     const n = localStorage.getItem("displayName");
-    const i = localStorage.getItem("invites");
-    const t = localStorage.getItem("tasks");
     const g = localStorage.getItem("dailyGoal");
-
     if (a) setAvatarDataUrl(a);
     if (n) setDisplayName(n);
-    if (i) { try { setInvites(JSON.parse(i)); } catch {} }
-    if (t) { try { setTasks(JSON.parse(t)); } catch {} }
     if (g) setDailyGoal(Number(g));
   }, [authReady]);
 
-  // ─── Logout ───────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!authReady) return;
+    const loadTasks = async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const user = userData?.user;
+      if (!user) return;
+      const { data } = await supabase.from("tasks_v2")
+        .select("id, title, is_completed, status, priority, category_id, due_date, created_at, updated_at")
+        .eq("user_id", user.id);
+      setTasks((data ?? []).map(row => ({
+        id: row.id, text: row.title, done: row.is_completed, status: row.status,
+        category: row.category_id, due: row.due_date ?? "No date",
+        completedAt: row.is_completed ? row.updated_at : null,
+      })));
+    };
+    loadTasks();
+  }, [authReady]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    ["tasks", "folders", "categories", "avatar", "displayName", "userEmail"].forEach((k) =>
-      localStorage.removeItem(k)
-    );
+    ["tasks", "folders", "categories", "avatar", "displayName", "userEmail"].forEach(k => localStorage.removeItem(k));
     router.push("/login");
   };
 
@@ -110,221 +111,182 @@ export default function StatisticsPage() {
     localStorage.setItem("dailyGoal", String(next));
   };
 
-  const getInitials = (name = displayName) =>
-    name.split(" ").map((x: string) => x[0]).slice(0, 2).join("").toUpperCase();
+  const getInitials = (name = displayName) => name.split(" ").map((x: string) => x[0]).slice(0, 2).join("").toUpperCase();
 
-  const inlineStyles = `
-    @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-    .animate-slide-in { animation: slideIn 240ms ease-out forwards; }
-  `;
-
-  // ─── Stats ────────────────────────────────────────────────────────────────
-  const todayKey = new Date().toISOString().slice(0, 10);
-  const completedTasksArr = tasks.filter((t) => t.done);
+  const todayKey = new Date().toLocaleDateString("en-CA");
+  const completedTasksArr = tasks.filter(t => t.done);
   const totalTasks = tasks.length;
   const completedTasks = completedTasksArr.length;
   const completionRate = totalTasks === 0 ? 0 : Math.round((completedTasks / totalTasks) * 100);
-  const countToday = completedTasksArr.filter((t) => t.completedAt?.startsWith(todayKey)).length;
+  const countToday = completedTasksArr.filter(t => t.completedAt?.startsWith(todayKey)).length;
   const progressPercent = Math.min(100, Math.round((countToday / Math.max(1, dailyGoal)) * 100));
 
   const categoryCounts: Record<string, number> = {};
-  tasks.forEach((t) => {
-    if (!categoryCounts[t.category]) categoryCounts[t.category] = 0;
-    categoryCounts[t.category]++;
-  });
+  tasks.forEach(t => { if (!categoryCounts[t.category]) categoryCounts[t.category] = 0; categoryCounts[t.category]++; });
   const sortedCategories = Object.entries(categoryCounts).sort((a, b) => b[1] - a[1]);
 
   const weeklyChartData = useMemo(() => {
     const labels = ["M", "T", "W", "Th", "F", "Sa", "Su"];
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
+      const d = new Date(); d.setDate(d.getDate() - (6 - i));
       const dKey = d.toISOString().slice(0, 10);
-      const count = completedTasksArr.filter((t) => t.completedAt?.startsWith(dKey)).length;
+      const count = completedTasksArr.filter(t => t.completedAt?.startsWith(dKey)).length;
       return { day: labels[i], count, isToday: i === 6 };
     });
   }, [completedTasksArr]);
 
-  const maxVal = Math.max(...weeklyChartData.map((d) => d.count), 1);
+  const maxVal = Math.max(...weeklyChartData.map(d => d.count), 1);
 
-  // ─── Loading screen ───────────────────────────────────────────────────────
-  if (!authReady) {
-    return (
-      <div className="min-h-screen bg-[#fafafa] flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-5xl mb-4">🐝</div>
-          <div className="text-gray-500 text-sm font-medium">Loading your tasks...</div>
-        </div>
-      </div>
-    );
-  }
+  const inlineStyles = `
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    * { font-family: 'DM Sans', sans-serif; }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .slide-up { animation: slideUp 0.35s ease-out forwards; }
+    .fade-in { animation: fadeIn 0.25s ease-out forwards; }
+    ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
+  `;
+
+  if (!authReady) return (
+    <div className="min-h-screen flex items-center justify-center" style={{ background: t.bg }}>
+      <div className="text-center"><div className="text-5xl mb-4">🐝</div><div className="text-sm font-medium" style={{ color: t.textDim }}>Loading your hive...</div></div>
+    </div>
+  );
 
   return (
-    <main className={`min-h-screen bg-[#fafafa] p-6 text-[#1a1a1a] transition-all ${sidebarOpen ? "ml-80" : "ml-0"}`}>
+    <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease, color 0.3s ease" }}>
       <style>{inlineStyles}</style>
 
       {/* SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-[#FFFDF2] p-6 shadow-2xl transition-transform duration-300 rounded-r-3xl border-r border-yellow-200 overflow-y-auto ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-2xl font-extrabold">Do Bee</h2>
-          <button onClick={() => setSidebarOpen(false)} className="p-2 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">✕</button>
+      <aside className="fixed inset-y-0 left-0 z-50 w-72 flex flex-col transition-transform duration-300"
+        style={{ background: t.surface, borderRight: `1px solid ${t.border}`, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)" }}>
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-2"><span className="text-2xl">🐝</span><span className="text-xl font-bold" style={{ color: t.accent }}>Do Bee</span></div>
+            <div className="flex items-center gap-2">
+              <button onClick={toggleTheme} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover }}>{isDark ? "☀️" : "🌙"}</button>
+              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>✕</button>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
+            {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
+            <div className="text-sm font-semibold" style={{ color: t.text }}>{displayName}</div>
+          </div>
+          <nav className="space-y-1">
+            {NAV_ITEMS.map(item => (
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
+                <span>{item.icon}</span><span>{item.label}</span>
+              </a>
+            ))}
+          </nav>
         </div>
-
-        <div className="flex items-center gap-3 mb-4">
-          {avatarDataUrl ? (
-            <img src={avatarDataUrl} alt="avatar" className="w-14 h-14 rounded-full object-cover shadow" />
-          ) : (
-            <div className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center font-semibold shadow">{getInitials()}</div>
-          )}
-          <div className="font-medium text-sm">{displayName}</div>
-        </div>
-
-        <nav className="space-y-3 animate-slide-in mb-6">
-          <a href="/dashboard" className="flex items-center gap-3 bg-white shadow px-4 py-3 rounded-xl hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zM13 21h8V11h-8v10zM13 3v6h8V3h-8z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Dashboard</span>
-          </a>
-          <a href="/calendar" className="flex items-center gap-3 bg-white shadow px-4 py-3 rounded-xl hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Calendar</span>
-          </a>
-          <a href="/statistics" className="flex items-center gap-3 bg-[#ffd6e8] shadow px-4 py-3 rounded-xl transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M3 17h4V7H3v10zm6 0h4V3H9v14zm6 0h4v-4h-4v4z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Statistics</span>
-          </a>
-          <a href="/settings" className="flex items-center gap-3 bg-white shadow px-4 py-3 rounded-xl hover:bg-[#fff8d6] transition">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 8a4 4 0 100 8 4 4 0 000-8zM21.4 10.11c.04.29.06.58.06.89s-.02.6-.06.89l2.05 1.6a1 1 0 01.22 1.29l-1.94 3.36a1 1 0 01-1.22.44l-2.42-.97a7.4 7.4 0 01-1.55.9l-.78 2.41a1 1 0 01-.97.6h-5.26a1 1 0 01-.97-.6l-.78-2.41a7.36 7.36 0 01-1.55-.9l-2.42.97a1 1 0 01-1.22-.44L.48 13.18a1 1 0 01.22-1.29l2.05-1.6A7.3 7.3 0 013 9.11V8z" fill="#1a1a1a" /></svg>
-            <span className="font-medium">Settings</span>
-          </a>
-        </nav>
-
-        <div className="mb-6">
-          <h4 className="text-sm font-medium mb-2">Invited</h4>
-          <ul className="text-xs text-[#1a1a1a] max-h-24 overflow-auto space-y-1">
-            {invites.map((i) => <li key={i}>{i}</li>)}
-            {invites.length === 0 && <li className="opacity-50">No invites yet</li>}
-          </ul>
-        </div>
-
-        <div className="mt-auto pt-6 border-t border-yellow-200">
-          <button onClick={handleLogout} className="w-full py-3 rounded-xl bg-red-100 text-red-700 font-medium hover:bg-red-200 transition shadow-sm">Logout</button>
+        <div className="p-6" style={{ borderTop: `1px solid ${t.border}` }}>
+          <button onClick={handleLogout} className="w-full py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Sign Out</button>
         </div>
       </aside>
 
-      {/* TOP BAR */}
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            {!sidebarOpen && (
-              <button onClick={() => setSidebarOpen(true)} className="p-3 rounded-lg bg-[#1a1a1a] text-[#fffbe6] hover:bg-[#ffd6e8] hover:text-black transition">☰</button>
-            )}
-            <div className="relative">
-              <div className="flex items-center bg-white rounded-3xl shadow-sm px-3 py-2 focus-within:ring-2 focus-within:ring-[#f5e99f] border transition">
-                <svg width="18" height="18" viewBox="0 0 24 24" className="opacity-60 mr-2">
-                  <circle cx="11" cy="11" r="8" stroke="#6b6b6b" strokeWidth="2" fill="none" />
-                  <path d="M21 21l-4.35-4.35" stroke="#6b6b6b" strokeWidth="2" strokeLinecap="round" fill="none" />
-                </svg>
-                <input value={rawSearch} onChange={(e) => setRawSearch(e.target.value)} placeholder="Search..." className="outline-none px-2 bg-transparent w-80 md:w-96" />
-                {rawSearch && <button onClick={() => setRawSearch("")} className="text-xs px-2 py-1 rounded-full hover:bg-gray-100">Clear</button>}
-              </div>
+      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 fade-in" onClick={() => setSidebarOpen(false)} />}
+
+      {/* HEADER */}
+      <header className="sticky top-0 z-30 px-6 py-4 flex items-center justify-between"
+        style={{ background: isDark ? "rgba(17,17,19,0.92)" : "rgba(255,250,243,0.92)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${t.border}` }}>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
+            <div className="text-lg font-bold" style={{ color: t.text }}>Statistics</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>{isDark ? "☀️" : "🌙"}</button>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden" style={{ background: t.accent, color: t.accentText }}>
+            {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-9 h-9 object-cover" /> : getInitials()}
+          </div>
+        </div>
+      </header>
+
+      <div className="p-6 max-w-4xl mx-auto space-y-6 slide-up">
+        {/* Overview */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {[{ label: "Total Tasks", value: totalTasks, color: t.accent }, { label: "Completed", value: completedTasks, color: t.success }, { label: "Completion Rate", value: `${completionRate}%`, color: t.accent }].map(({ label, value, color }) => (
+            <div key={label} className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+              <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>{label}</div>
+              <div className="text-4xl font-extrabold" style={{ color }}>{value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Daily Goal + Hexagon */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <h2 className="text-lg font-bold text-center mb-6" style={{ color: t.text }}>Today&apos;s Progress</h2>
+          <div className="flex items-center justify-between mb-8 p-4 rounded-xl" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>
+            <div>
+              <div className="text-sm font-semibold" style={{ color: t.text }}>Daily Goal</div>
+              <div className="text-xs" style={{ color: t.textDim }}>Tasks to complete each day</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={() => handleGoalChange(-1)} className="w-9 h-9 rounded-lg flex items-center justify-center text-xl font-bold" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.text }}>−</button>
+              <div className="px-5 py-2 min-w-[90px] text-center font-bold text-sm rounded-lg" style={{ background: t.accent, color: t.accentText }}>{dailyGoal} tasks</div>
+              <button onClick={() => handleGoalChange(1)} className="w-9 h-9 rounded-lg flex items-center justify-center text-xl font-bold" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.text }}>+</button>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-sm text-right">
-              <div className="font-semibold">Today</div>
-              <div className="text-xs">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</div>
+          <div className="flex flex-col items-center">
+            <div className="relative flex items-center justify-center">
+              <span style={{ position: "absolute", left: -52, top: 14, fontSize: 28, transform: "rotate(-15deg)" }}>🐝</span>
+              <span style={{ position: "absolute", right: -52, top: 14, fontSize: 28, transform: "rotate(15deg)" }}>🐝</span>
+              <HoneycombLiquid percent={progressPercent} accentColor={t.accent} />
+              <div className="absolute text-center pointer-events-none">
+                <div className="text-3xl font-black" style={{ color: t.text }}>{progressPercent}%</div>
+                <div className="text-xs font-bold mt-1" style={{ color: t.textMuted }}>{countToday} / {dailyGoal} today</div>
+              </div>
             </div>
-            <div className="w-10 h-10 rounded-full shadow bg-gradient-to-tr from-pink-200 to-yellow-100 flex items-center justify-center">
-              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-8 h-8 rounded-full object-cover" /> : <span className="font-semibold">{getInitials()}</span>}
-            </div>
+            <p className="text-xs mt-4" style={{ color: t.textDim }}>Fill the honeycomb by completing your daily goal!</p>
           </div>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div className="max-w-4xl mx-auto space-y-8">
-
-          {/* OVERVIEW CARDS */}
-          <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-2xl border shadow">
-              <h3 className="text-lg font-semibold">Total Tasks</h3>
-              <p className="text-4xl font-extrabold mt-2">{totalTasks}</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border shadow">
-              <h3 className="text-lg font-semibold">Completed</h3>
-              <p className="text-4xl font-extrabold mt-2 text-green-600">{completedTasks}</p>
-            </div>
-            <div className="bg-white p-6 rounded-2xl border shadow">
-              <h3 className="text-lg font-semibold">Completion Rate</h3>
-              <p className="text-4xl font-extrabold mt-2">{completionRate}%</p>
-            </div>
-          </section>
-
-          {/* DAILY GOAL + NECTAR HEXAGON */}
-          <section className="bg-white rounded-2xl border shadow p-6">
-            <h2 className="text-xl font-semibold mb-6 text-center">Today&apos;s Progress</h2>
-            <div className="flex items-center justify-between mb-8 bg-[#fff6f9] rounded-xl p-4 border border-[#ffd6e8]">
-              <div>
-                <div className="font-semibold text-sm">Daily Goal</div>
-                <div className="text-xs text-gray-500 mt-0.5">Tasks to complete each day</div>
+        {/* Weekly Activity */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <h2 className="text-lg font-bold mb-5" style={{ color: t.text }}>Weekly Activity</h2>
+          <div className="flex items-end gap-3 h-40">
+            {weeklyChartData.map((d, i) => (
+              <div key={i} className="flex flex-col items-center flex-1">
+                {d.count > 0 && <span className="text-xs mb-1" style={{ color: t.textDim }}>{d.count}</span>}
+                <div className="w-full rounded-t-xl transition-all duration-500"
+                  style={{ height: `${(d.count / maxVal) * 100}%`, minHeight: d.count > 0 ? 8 : 4, background: d.isToday ? t.accent : `${t.accent}50`, opacity: d.count === 0 ? 0.2 : 1 }} />
+                <span className="text-xs mt-2 font-medium" style={{ color: d.isToday ? t.accent : t.textDim }}>{d.day}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleGoalChange(-1)} className="w-9 h-9 rounded-lg bg-white border border-[#ffd6e8] text-xl font-bold flex items-center justify-center hover:bg-[#ffd6e8] transition">−</button>
-                <div className="bg-[#ffd6e8] rounded-lg px-5 py-2 min-w-[90px] text-center font-bold text-sm">{dailyGoal} tasks</div>
-                <button onClick={() => handleGoalChange(1)} className="w-9 h-9 rounded-lg bg-white border border-[#ffd6e8] text-xl font-bold flex items-center justify-center hover:bg-[#ffd6e8] transition">+</button>
-              </div>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="relative flex items-center justify-center">
-                <span style={{ position: "absolute", left: -52, top: 14, fontSize: 28, transform: "rotate(-15deg)" }}>🐝</span>
-                <span style={{ position: "absolute", right: -52, top: 14, fontSize: 28, transform: "rotate(15deg)" }}>🐝</span>
-                <HoneycombLiquid percent={progressPercent} />
-                <div className="absolute text-center pointer-events-none">
-                  <div className="text-3xl font-black text-[#1a1a1a]">{progressPercent}%</div>
-                  <div className="text-xs font-bold text-gray-500 mt-1">{countToday} / {dailyGoal} today</div>
-                </div>
-              </div>
-              <p className="text-xs text-gray-400 mt-4">Fill the honeycomb by completing your daily goal!</p>
-            </div>
-          </section>
+            ))}
+          </div>
+        </div>
 
-          {/* WEEKLY PROGRESS GRAPH */}
-          <section className="bg-white p-6 rounded-2xl border shadow">
-            <h2 className="text-xl font-semibold mb-4">Weekly Activity</h2>
-            <div className="flex items-end gap-3 h-40">
-              {weeklyChartData.map((d, i) => (
-                <div key={i} className="flex flex-col items-center flex-1">
-                  {d.count > 0 && <span className="text-xs text-gray-400 mb-1">{d.count}</span>}
-                  <div
-                    className="w-full rounded-t-xl transition-all duration-500"
-                    style={{ height: `${(d.count / maxVal) * 100}%`, minHeight: d.count > 0 ? 8 : 0, background: d.isToday ? "#f9a8c9" : LIGHT_PINK, opacity: d.count === 0 ? 0.2 : 1 }}
-                  />
-                  <span className={`text-xs mt-2 ${d.isToday ? "font-bold text-pink-500" : "text-gray-400"}`}>{d.day}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* TOP CATEGORIES */}
-          <section className="bg-white p-6 rounded-2xl border shadow">
-            <h2 className="text-xl font-semibold mb-4">Top Categories</h2>
-            {sortedCategories.length === 0 && <p className="text-sm opacity-70">No tasks yet.</p>}
-            <ul className="space-y-3">
+        {/* Top Categories */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <h2 className="text-lg font-bold mb-4" style={{ color: t.text }}>Top Categories</h2>
+          {sortedCategories.length === 0 ? <p className="text-sm" style={{ color: t.textDim }}>No tasks yet.</p> : (
+            <div className="space-y-3">
               {sortedCategories.map(([cat, count]) => (
-                <li key={cat} className="flex items-center justify-between bg-[#fff6f9] p-3 rounded-xl border">
-                  <span className="font-medium">{cat}</span>
-                  <span className="text-sm opacity-80">{count} tasks</span>
-                </li>
+                <div key={cat} className="flex items-center justify-between p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                  <span className="font-medium text-sm" style={{ color: t.text }}>{cat}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="h-1.5 w-24 rounded-full overflow-hidden" style={{ background: t.border }}>
+                      <div className="h-full rounded-full" style={{ width: `${(count / totalTasks) * 100}%`, background: t.accent }} />
+                    </div>
+                    <span className="text-xs font-medium" style={{ color: t.accent }}>{count}</span>
+                  </div>
+                </div>
               ))}
-            </ul>
-          </section>
+            </div>
+          )}
+        </div>
 
-          {/* ACTIVITY SUMMARY */}
-          <section className="bg-white p-6 rounded-2xl border shadow">
-            <h2 className="text-xl font-semibold mb-3">Activity Summary</h2>
-            <p className="text-sm opacity-80">You&apos;ve completed <b>{completedTasks}</b> out of <b>{totalTasks}</b> tasks so far.</p>
-            <p className="text-sm opacity-80 mt-2">Keep it up — every task fills the hive! 🍯</p>
-          </section>
-
+        {/* Summary */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <h2 className="text-lg font-bold mb-3" style={{ color: t.text }}>Activity Summary</h2>
+          <p className="text-sm" style={{ color: t.textMuted }}>You&apos;ve completed <span className="font-bold" style={{ color: t.success }}>{completedTasks}</span> out of <span className="font-bold" style={{ color: t.text }}>{totalTasks}</span> tasks so far.</p>
+          <p className="text-sm mt-2" style={{ color: t.textMuted }}>Keep it up — every task fills the hive! 🍯</p>
         </div>
       </div>
     </main>

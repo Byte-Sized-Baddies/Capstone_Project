@@ -55,22 +55,29 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     const check = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) { router.push("/login"); return; }
-      setUserId(data.session.user.id);
-      const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split("@")[0] || "User";
-      setDisplayName(name);
-      setAuthReady(true);
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!data.session) { router.push("/login"); return; }
+        setUserId(data.session.user.id);
+        const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split("@")[0] || "User";
+        setDisplayName(name);
 
-      // Check for Google OAuth callback
-      const params = new URLSearchParams(window.location.search);
-      const gcalConnected = params.get("gcal");
-      const gcalError = params.get("error");
-      if (gcalConnected === "connected") setStatusMsg("✅ Google Calendar connected successfully!");
-      if (gcalError) setStatusMsg(`❌ Google Calendar error: ${gcalError}`);
-      if (gcalConnected || gcalError) window.history.replaceState({}, "", "/integrations");
+        // Check for Google OAuth callback
+        const params = new URLSearchParams(window.location.search);
+        const gcalConnected = params.get("gcal");
+        const gcalError = params.get("error");
+        if (gcalConnected === "connected") setStatusMsg("✅ Google Calendar connected successfully!");
+        if (gcalError) setStatusMsg(`❌ Google Calendar error: ${gcalError}`);
+        if (gcalConnected || gcalError) window.history.replaceState({}, "", "/integrations");
+      } catch (e) {
+        console.error("Auth check failed:", e);
+      } finally {
+        setAuthReady(true);
+      }
     };
-    const { data: l } = supabase.auth.onAuthStateChange(() => check());
+    const { data: l } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) check(); else { setAuthReady(true); router.push("/login"); }
+    });
     check();
     return () => l.subscription.unsubscribe();
   }, [router]);

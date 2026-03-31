@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUpWithEmail, signInWithOAuth } from "../auth/auth";
+import AlertDialog from "../components/AlertDialog";
 import { FcGoogle } from "react-icons/fc";
 import { FaApple, FaMicrosoft } from "react-icons/fa";
 
@@ -14,6 +15,7 @@ export default function SignUpPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [isDark, setIsDark] = useState(true);
 
   useEffect(() => {
@@ -37,11 +39,15 @@ export default function SignUpPage() {
       setLoading(true);
       const { error } = await signUpWithEmail(email, password);
       if (error) return setErr(error.message);
-      alert("Check your email for a confirmation link.");
-      router.push("/");
+      setShowSuccessDialog(true);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSuccessConfirm = () => {
+    setShowSuccessDialog(false);
+    router.push("/");
   };
 
   const handleOAuthSignIn = async (provider: "google" | "apple" | "azure") => {
@@ -162,6 +168,15 @@ export default function SignUpPage() {
           <Link href="/" style={{ color: accent, fontWeight: 600, textDecoration: "none" }}>Sign In</Link>
         </p>
       </div>
+
+      <AlertDialog
+        open={showSuccessDialog}
+        title="Check your email"
+        message="We sent a confirmation link to your email address."
+        confirmText="OK"
+        onConfirm={handleSuccessConfirm}
+        isDark={isDark}
+      />
     </main>
   );
 }

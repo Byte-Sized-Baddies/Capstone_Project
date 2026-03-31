@@ -141,7 +141,7 @@ export default function IntegrationsPage() {
 
   // ── GOOGLE CALENDAR ────────────────────────────────────────────────────────
   const connectGoogleCalendar = () => {
-    window.location.href = "/api/auth/google";
+    window.location.href = `/api/auth/google?userId=${userId}`;
   };
 
   const disconnectGoogleCalendar = async () => {

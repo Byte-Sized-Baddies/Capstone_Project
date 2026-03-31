@@ -49,25 +49,19 @@ export async function GET(req: NextRequest) {
     }
   } catch { /* use primary as fallback */ }
 
-  // Get the Supabase user from the session cookie
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-  // We need the auth token from cookie to identify the user
-  const cookieHeader = req.headers.get("cookie") || "";
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { cookie: cookieHeader } },
-  });
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  // Get userId from state parameter (passed by /api/auth/google route)
+  const userId = searchParams.get("state");
+  if (!userId) {
     return NextResponse.redirect(`${appUrl}/login`);
   }
 
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
   // Store tokens in Supabase
   await supabase.from("integrations_v2").upsert({
-    user_id: user.id,
+    user_id: userId,
     service: "google_calendar",
     config: {
       access_token: tokens.access_token,

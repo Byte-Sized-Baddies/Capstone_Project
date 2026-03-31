@@ -29,6 +29,7 @@ const NAV_ITEMS = [
 ];
 
 interface Integration { service: string; config: any; enabled: boolean; }
+interface GmailEmail { id: string; subject: string; from: string; snippet: string; }
 
 export default function IntegrationsPage() {
   const router = useRouter();
@@ -42,13 +43,20 @@ export default function IntegrationsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [integrations, setIntegrations] = useState<Record<string, Integration>>({});
-  const [slackWebhook, setSlackWebhook] = useState("");
-  const [slackSaving, setSlackSaving] = useState(false);
-  const [slackTesting, setSlackTesting] = useState(false);
-  const [slackTestResult, setSlackTestResult] = useState<"success" | "error" | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // Google Calendar state
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalSyncResult, setGcalSyncResult] = useState<string | null>(null);
-  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // Gmail state
+  const [gmailEmails, setGmailEmails] = useState<GmailEmail[]>([]);
+  const [gmailLoading, setGmailLoading] = useState(false);
+  const [gmailTaskCreating, setGmailTaskCreating] = useState<string | null>(null);
+
+  // Outlook state
+  const [outlookSyncing, setOutlookSyncing] = useState(false);
+  const [outlookSyncResult, setOutlookSyncResult] = useState<string | null>(null);
 
   useEffect(() => { const s = localStorage.getItem("theme"); if (s) setIsDark(s === "dark"); }, []);
   const toggleTheme = () => setIsDark(p => { localStorage.setItem("theme", !p ? "dark" : "light"); return !p; });
@@ -62,13 +70,16 @@ export default function IntegrationsPage() {
         const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split("@")[0] || "User";
         setDisplayName(name);
 
-        // Check for Google OAuth callback
         const params = new URLSearchParams(window.location.search);
         const gcalConnected = params.get("gcal");
-        const gcalError = params.get("error");
+        const gmailConnected = params.get("gmail");
+        const outlookConnected = params.get("outlook");
+        const err = params.get("error");
         if (gcalConnected === "connected") setStatusMsg("✅ Google Calendar connected successfully!");
-        if (gcalError) setStatusMsg(`❌ Google Calendar error: ${gcalError}`);
-        if (gcalConnected || gcalError) window.history.replaceState({}, "", "/integrations");
+        if (gmailConnected === "connected") setStatusMsg("✅ Gmail connected successfully!");
+        if (outlookConnected === "connected") setStatusMsg("✅ Microsoft Outlook connected successfully!");
+        if (err) setStatusMsg(`❌ Connection error: ${err}`);
+        if (gcalConnected || gmailConnected || outlookConnected || err) window.history.replaceState({}, "", "/integrations");
       } catch (e) {
         console.error("Auth check failed:", e);
       } finally {
@@ -96,7 +107,6 @@ export default function IntegrationsPage() {
       const map: Record<string, Integration> = {};
       data.forEach((row: any) => { map[row.service] = row; });
       setIntegrations(map);
-      if (map.slack?.config?.webhook_url) setSlackWebhook(map.slack.config.webhook_url);
     };
     load();
   }, [authReady, userId]);
@@ -104,70 +114,86 @@ export default function IntegrationsPage() {
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/login"); };
   const getInitials = () => displayName.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 
-  // ── SLACK ──────────────────────────────────────────────────────────────────
-  const saveSlack = async () => {
-    if (!userId) return;
-    setSlackSaving(true);
-    await supabase.from("integrations_v2").upsert({
-      user_id: userId, service: "slack",
-      config: { webhook_url: slackWebhook }, enabled: true,
-    }, { onConflict: "user_id,service" });
-    setIntegrations(prev => ({ ...prev, slack: { service: "slack", config: { webhook_url: slackWebhook }, enabled: true } }));
-    setSlackSaving(false);
-    setStatusMsg("✅ Slack webhook saved!");
-    setTimeout(() => setStatusMsg(null), 3000);
-  };
-
-  const testSlack = async () => {
-    if (!slackWebhook) return;
-    setSlackTesting(true); setSlackTestResult(null);
-    try {
-      const res = await fetch("/api/integrations/slack/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ webhook_url: slackWebhook, text: "🐝 Do Bee integration test — it works!" }),
-      });
-      setSlackTestResult(res.ok ? "success" : "error");
-    } catch { setSlackTestResult("error"); }
-    setSlackTesting(false);
-  };
-
-  const disconnectSlack = async () => {
-    if (!userId || !confirm("Disconnect Slack?")) return;
-    await supabase.from("integrations_v2").delete().eq("user_id", userId).eq("service", "slack");
-    setIntegrations(prev => { const n = { ...prev }; delete n.slack; return n; });
-    setSlackWebhook("");
-  };
-
-  // ── GOOGLE CALENDAR ────────────────────────────────────────────────────────
-  const connectGoogleCalendar = () => {
-    window.location.href = `/api/auth/google?userId=${userId}`;
-  };
-
+  // ── GOOGLE CALENDAR ─────────────────────────────────────────────────────────
+  const connectGoogleCalendar = () => { window.location.href = `/api/auth/google?userId=${userId}`; };
   const disconnectGoogleCalendar = async () => {
     if (!userId || !confirm("Disconnect Google Calendar?")) return;
     await supabase.from("integrations_v2").delete().eq("user_id", userId).eq("service", "google_calendar");
     setIntegrations(prev => { const n = { ...prev }; delete n.google_calendar; return n; });
   };
-
   const syncGoogleCalendar = async () => {
     setGcalSyncing(true); setGcalSyncResult(null);
     try {
       const res = await fetch("/api/integrations/google-calendar/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId }),
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
       });
       const data = await res.json();
       if (res.ok) setGcalSyncResult(`✅ Synced ${data.synced} task${data.synced !== 1 ? "s" : ""} to Google Calendar`);
-      else setGcalSyncResult(`❌ Sync failed: ${data.error || "Unknown error"}`);
+      else setGcalSyncResult(`❌ Sync failed: ${data.error}`);
     } catch { setGcalSyncResult("❌ Sync failed — check your connection"); }
     setGcalSyncing(false);
   };
 
+  // ── GMAIL ───────────────────────────────────────────────────────────────────
+  const connectGmail = () => { window.location.href = `/api/auth/gmail?userId=${userId}`; };
+  const disconnectGmail = async () => {
+    if (!userId || !confirm("Disconnect Gmail?")) return;
+    await supabase.from("integrations_v2").delete().eq("user_id", userId).eq("service", "gmail");
+    setIntegrations(prev => { const n = { ...prev }; delete n.gmail; return n; });
+    setGmailEmails([]);
+  };
+  const fetchGmailEmails = async () => {
+    setGmailLoading(true);
+    try {
+      const res = await fetch("/api/integrations/gmail/emails", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (res.ok) setGmailEmails(data.emails || []);
+      else setStatusMsg(`❌ Failed to load emails: ${data.error}`);
+    } catch { setStatusMsg("❌ Failed to load emails"); }
+    setGmailLoading(false);
+  };
+  const createTaskFromEmail = async (email: GmailEmail) => {
+    if (!userId) return;
+    setGmailTaskCreating(email.id);
+    await supabase.from("tasks_v2").insert({
+      user_id: userId,
+      title: email.subject,
+      description: email.snippet,
+      is_completed: false,
+      is_archived: false,
+    });
+    setStatusMsg(`✅ Task created: "${email.subject}"`);
+    setTimeout(() => setStatusMsg(null), 3000);
+    setGmailTaskCreating(null);
+  };
+
+  // ── MICROSOFT OUTLOOK ────────────────────────────────────────────────────────
+  const connectOutlook = () => { window.location.href = `/api/auth/microsoft?userId=${userId}`; };
+  const disconnectOutlook = async () => {
+    if (!userId || !confirm("Disconnect Microsoft Outlook?")) return;
+    await supabase.from("integrations_v2").delete().eq("user_id", userId).eq("service", "microsoft_outlook");
+    setIntegrations(prev => { const n = { ...prev }; delete n.microsoft_outlook; return n; });
+  };
+  const syncOutlook = async () => {
+    setOutlookSyncing(true); setOutlookSyncResult(null);
+    try {
+      const res = await fetch("/api/integrations/outlook/sync", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (res.ok) setOutlookSyncResult(`✅ Synced ${data.synced} task${data.synced !== 1 ? "s" : ""} to Outlook`);
+      else setOutlookSyncResult(`❌ Sync failed: ${data.error}`);
+    } catch { setOutlookSyncResult("❌ Sync failed — check your connection"); }
+    setOutlookSyncing(false);
+  };
+
   const gcal = integrations.google_calendar;
-  const slack = integrations.slack;
-  const gcalClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const gmail = integrations.gmail;
+  const outlook = integrations.microsoft_outlook;
+  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+  const microsoftClientId = process.env.NEXT_PUBLIC_MICROSOFT_CLIENT_ID;
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -258,138 +284,141 @@ export default function IntegrationsPage() {
                 <div className="text-xs mt-0.5" style={{ color: t.textDim }}>Sync tasks with due dates to your calendar</div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              {gcal ? (
-                <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: t.success + "20", color: t.success }}>● Connected</span>
-              ) : (
-                <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: t.surfaceHover, color: t.textDim }}>Not connected</span>
-              )}
-            </div>
+            <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: gcal ? t.success + "20" : t.surfaceHover, color: gcal ? t.success : t.textDim }}>
+              {gcal ? "● Connected" : "Not connected"}
+            </span>
           </div>
-
           {gcal ? (
             <div className="space-y-3">
               <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: t.textDim }}>
                 Calendar: {gcal.config?.calendar_id || "Primary calendar"}
               </div>
               {gcalSyncResult && (
-                <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: gcalSyncResult.startsWith("✅") ? t.success : t.danger }}>
-                  {gcalSyncResult}
-                </div>
+                <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: gcalSyncResult.startsWith("✅") ? t.success : t.danger }}>{gcalSyncResult}</div>
               )}
               <div className="flex gap-2">
-                <button onClick={syncGoogleCalendar} disabled={gcalSyncing}
-                  className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                <button onClick={syncGoogleCalendar} disabled={gcalSyncing} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
                   style={{ background: t.accent, color: t.accentText, opacity: gcalSyncing ? 0.6 : 1 }}>
                   {gcalSyncing ? "Syncing…" : "↻ Sync now"}
                 </button>
-                <button onClick={disconnectGoogleCalendar}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
-                  style={{ background: t.surfaceHover, color: t.danger }}>
-                  Disconnect
-                </button>
+                <button onClick={disconnectGoogleCalendar} className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Disconnect</button>
               </div>
             </div>
           ) : (
-            <div>
-              {!gcalClientId ? (
-                <div className="rounded-xl p-4 mb-4 text-sm" style={{ background: t.surfaceHover, color: t.textMuted }}>
-                  <p className="font-semibold mb-2" style={{ color: t.text }}>Setup required (one-time, ~5 mins)</p>
-                  <ol className="space-y-1.5 list-decimal list-inside text-xs">
-                    <li>Go to <strong>console.cloud.google.com</strong></li>
-                    <li>Create a project → Enable <strong>Google Calendar API</strong></li>
-                    <li>Create <strong>OAuth 2.0 credentials</strong> (Web application)</li>
-                    <li>Add redirect URI: <code className="px-1 rounded" style={{ background: t.border }}>{typeof window !== "undefined" ? window.location.origin : "https://yourapp.vercel.app"}/api/auth/google/callback</code></li>
-                    <li>Add to Vercel env vars: <code className="px-1 rounded" style={{ background: t.border }}>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> and <code className="px-1 rounded" style={{ background: t.border }}>GOOGLE_CLIENT_SECRET</code></li>
-                    <li>Redeploy, then come back here</li>
-                  </ol>
-                </div>
-              ) : (
-                <button onClick={connectGoogleCalendar}
-                  className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
-                  style={{ background: "#4285F4", color: "white" }}>
-                  <span>G</span> Connect Google Calendar
-                </button>
-              )}
-            </div>
+            <button onClick={connectGoogleCalendar} className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+              style={{ background: "#4285F4", color: "white" }}>
+              <span>G</span> Connect Google Calendar
+            </button>
           )}
         </div>
 
-        {/* ── SLACK ── */}
+        {/* ── GMAIL ── */}
         <div className="rounded-2xl p-6 mb-4" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background: t.surfaceHover }}>💬</div>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background: t.surfaceHover }}>📧</div>
               <div>
-                <div className="font-bold" style={{ color: t.text }}>Slack</div>
-                <div className="text-xs mt-0.5" style={{ color: t.textDim }}>Get notified in Slack when tasks are completed</div>
+                <div className="font-bold" style={{ color: t.text }}>Gmail</div>
+                <div className="text-xs mt-0.5" style={{ color: t.textDim }}>Turn emails into tasks</div>
               </div>
             </div>
-            {slack && (
-              <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: t.success + "20", color: t.success }}>● Connected</span>
-            )}
+            <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: gmail ? t.success + "20" : t.surfaceHover, color: gmail ? t.success : t.textDim }}>
+              {gmail ? "● Connected" : "Not connected"}
+            </span>
           </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: t.textDim }}>
-                Incoming Webhook URL
-              </label>
-              <input value={slackWebhook} onChange={e => setSlackWebhook(e.target.value)}
-                placeholder="https://hooks.slack.com/services/…"
-                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none"
-                style={{ background: t.inputBg, color: t.text, border: `1px solid ${t.border}` }} />
-              <p className="text-xs mt-1.5" style={{ color: t.textDim }}>
-                Get a webhook URL from your Slack workspace → Apps → Incoming Webhooks
-              </p>
-            </div>
-            {slackTestResult && (
-              <div className="text-xs px-3 py-2 rounded-lg"
-                style={{ background: slackTestResult === "success" ? t.success + "20" : t.danger + "20", color: slackTestResult === "success" ? t.success : t.danger }}>
-                {slackTestResult === "success" ? "✅ Test message sent!" : "❌ Failed — check your webhook URL"}
-              </div>
-            )}
-            <div className="flex gap-2">
-              <button onClick={saveSlack} disabled={!slackWebhook || slackSaving}
-                className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                style={{ background: slackWebhook ? t.accent : t.surfaceHover, color: slackWebhook ? t.accentText : t.textDim, opacity: slackSaving ? 0.6 : 1 }}>
-                {slackSaving ? "Saving…" : "Save"}
-              </button>
-              <button onClick={testSlack} disabled={!slackWebhook || slackTesting}
-                className="px-4 py-2.5 rounded-xl text-sm font-medium"
-                style={{ background: t.surfaceHover, color: t.textMuted }}>
-                {slackTesting ? "Testing…" : "Test"}
-              </button>
-              {slack && (
-                <button onClick={disconnectSlack}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium"
-                  style={{ background: t.surfaceHover, color: t.danger }}>
-                  Disconnect
+          {gmail ? (
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <button onClick={fetchGmailEmails} disabled={gmailLoading} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ background: t.accent, color: t.accentText, opacity: gmailLoading ? 0.6 : 1 }}>
+                  {gmailLoading ? "Loading…" : "📥 Load unread emails"}
                 </button>
+                <button onClick={disconnectGmail} className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Disconnect</button>
+              </div>
+              {gmailEmails.length > 0 && (
+                <div className="space-y-2 mt-2">
+                  {gmailEmails.map(email => (
+                    <div key={email.id} className="rounded-xl p-3 flex items-start justify-between gap-3" style={{ background: t.surfaceHover }}>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{email.subject}</div>
+                        <div className="text-xs truncate mt-0.5" style={{ color: t.textDim }}>{email.from}</div>
+                        <div className="text-xs mt-1 line-clamp-2" style={{ color: t.textMuted }}>{email.snippet}</div>
+                      </div>
+                      <button onClick={() => createTaskFromEmail(email)} disabled={gmailTaskCreating === email.id}
+                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
+                        style={{ background: t.accent, color: t.accentText, opacity: gmailTaskCreating === email.id ? 0.6 : 1 }}>
+                        {gmailTaskCreating === email.id ? "…" : "+ Task"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {gmailEmails.length === 0 && !gmailLoading && (
+                <div className="text-xs text-center py-3" style={{ color: t.textDim }}>Click "Load unread emails" to see your inbox</div>
               )}
             </div>
-          </div>
+          ) : (
+            !googleClientId ? (
+              <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: t.textDim }}>
+                Add <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> to Vercel env vars to enable Gmail.
+              </div>
+            ) : (
+              <button onClick={connectGmail} className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                style={{ background: "#EA4335", color: "white" }}>
+                <span>✉</span> Connect Gmail
+              </button>
+            )
+          )}
         </div>
 
-        {/* ── COMING SOON ── */}
-        {[
-          { icon: "📧", name: "Gmail", desc: "Turn emails into tasks" },
-          { icon: "🗓️", name: "Microsoft Outlook", desc: "Sync with Outlook calendar & tasks" },
-          { icon: "🎮", name: "Discord", desc: "Create tasks from Discord messages" },
-          { icon: "📁", name: "Google Drive", desc: "Attach Drive files to tasks" },
-        ].map(item => (
-          <div key={item.name} className="rounded-2xl p-5 mb-4 flex items-center justify-between"
-            style={{ background: t.surface, border: `1px solid ${t.border}`, opacity: 0.6 }}>
+        {/* ── MICROSOFT OUTLOOK ── */}
+        <div className="rounded-2xl p-6 mb-4" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="flex items-start justify-between mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background: t.surfaceHover }}>{item.icon}</div>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background: t.surfaceHover }}>🗓️</div>
               <div>
-                <div className="font-bold" style={{ color: t.text }}>{item.name}</div>
-                <div className="text-xs mt-0.5" style={{ color: t.textDim }}>{item.desc}</div>
+                <div className="font-bold" style={{ color: t.text }}>Microsoft Outlook</div>
+                <div className="text-xs mt-0.5" style={{ color: t.textDim }}>Sync tasks with due dates to Outlook calendar</div>
               </div>
             </div>
-            <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: t.surfaceHover, color: t.textDim }}>Coming soon</span>
+            <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: outlook ? t.success + "20" : t.surfaceHover, color: outlook ? t.success : t.textDim }}>
+              {outlook ? "● Connected" : "Not connected"}
+            </span>
           </div>
-        ))}
+          {outlook ? (
+            <div className="space-y-3">
+              {outlookSyncResult && (
+                <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: outlookSyncResult.startsWith("✅") ? t.success : t.danger }}>{outlookSyncResult}</div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={syncOutlook} disabled={outlookSyncing} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                  style={{ background: t.accent, color: t.accentText, opacity: outlookSyncing ? 0.6 : 1 }}>
+                  {outlookSyncing ? "Syncing…" : "↻ Sync now"}
+                </button>
+                <button onClick={disconnectOutlook} className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Disconnect</button>
+              </div>
+            </div>
+          ) : (
+            !microsoftClientId ? (
+              <div className="rounded-xl p-4 text-sm" style={{ background: t.surfaceHover, color: t.textMuted }}>
+                <p className="font-semibold mb-2" style={{ color: t.text }}>Setup required (one-time, ~5 mins)</p>
+                <ol className="space-y-1.5 list-decimal list-inside text-xs">
+                  <li>Go to <strong>portal.azure.com</strong> → App registrations → New registration</li>
+                  <li>Set redirect URI to: <code className="px-1 rounded" style={{ background: t.border }}>{typeof window !== "undefined" ? window.location.origin : "https://yourapp.vercel.app"}/api/auth/microsoft/callback</code></li>
+                  <li>Under Certificates & secrets → New client secret</li>
+                  <li>Under API permissions → Add <strong>Calendars.ReadWrite</strong> (Microsoft Graph)</li>
+                  <li>Add to Vercel env vars: <code className="px-1 rounded" style={{ background: t.border }}>NEXT_PUBLIC_MICROSOFT_CLIENT_ID</code> and <code className="px-1 rounded" style={{ background: t.border }}>MICROSOFT_CLIENT_SECRET</code></li>
+                  <li>Redeploy, then come back here</li>
+                </ol>
+              </div>
+            ) : (
+              <button onClick={connectOutlook} className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
+                style={{ background: "#0078D4", color: "white" }}>
+                <span>⊞</span> Connect Microsoft Outlook
+              </button>
+            )
+          )}
+        </div>
       </div>
     </main>
   );

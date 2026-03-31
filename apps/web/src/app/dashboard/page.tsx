@@ -130,10 +130,25 @@ function DashboardContent() {
   }, [router]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    ["tasks", "folders", "categories", "avatar", "displayName"].forEach(k => localStorage.removeItem(k));
-    router.push("/login");
-  };
+  try {
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      console.error("Logout failed:", error);
+      alert(`Logout failed: ${error.message}`);
+      return;
+    }
+
+    ["tasks", "folders", "categories", "avatar", "displayName"].forEach((k) =>
+      localStorage.removeItem(k)
+    );
+
+    window.location.href = "/login";
+  } catch (err) {
+    console.error("Unexpected logout error:", err);
+    alert("Something went wrong while signing out.");
+  }
+};
 
   useEffect(() => {
     const tm = setTimeout(() => setSearchQuery(rawSearch.trim()), 280);
@@ -520,7 +535,7 @@ function DashboardContent() {
             </div>
             <div className="flex items-center gap-2">
               <button onClick={toggleTheme} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover }}>{isDark ? "☀️" : "🌙"}</button>
-              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>✕</button>
+              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer" style={{ background: t.surfaceHover, color: t.textMuted }}>✕</button>
             </div>
           </div>
           <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
@@ -564,27 +579,32 @@ function DashboardContent() {
 
         </div>
         <div className="p-6" style={{ borderTop: `1px solid ${t.border}` }}>
-          <button onClick={handleLogout} className="w-full py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Sign Out</button>
+          <button onClick={handleLogout} className="w-full py-2.5 rounded-xl text-sm font-medium cursor-pointer" style={{ background: t.surfaceHover, color: t.danger }}>Sign Out</button>
         </div>
       </aside>
 
-      {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 fade-in" onClick={() => setSidebarOpen(false)} />}
+      {sidebarOpen && (
+  <div
+    className="fixed inset-0 z-40 bg-black/60 fade-in cursor-pointer"
+    onClick={() => setSidebarOpen(false)}
+  />
+)}
 
       {/* MAIN */}
       <div className="min-h-screen flex flex-col">
         <header className="sticky top-0 z-30 px-6 py-4 flex items-center justify-between"
           style={{ background: isDark ? "rgba(17,17,19,0.92)" : "rgba(255,250,243,0.92)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${t.border}` }}>
           <div className="flex items-center gap-3">
-            <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
+            <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke={t.textDim} strokeWidth="2" /><path d="M20 20l-3-3" stroke={t.textDim} strokeWidth="2" strokeLinecap="round" /></svg>
               <input ref={searchRef} value={rawSearch} onChange={e => setRawSearch(e.target.value)} placeholder="Search tasks..."
                 className="bg-transparent outline-none text-sm w-52" style={{ color: t.text }} />
-              {rawSearch && <button onClick={() => setRawSearch("")} className="text-xs" style={{ color: t.textDim }}>✕</button>}
+              {rawSearch && <button onClick={() => setRawSearch("")} className="text-xs cursor-pointer" style={{ color: t.textDim }}>✕</button>}
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>{isDark ? "☀️" : "🌙"}</button>
+            <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>{isDark ? "☀️" : "🌙"}</button>
             <div className="text-right">
               <div className="text-xs font-medium" style={{ color: t.textDim }}>Today</div>
               <div className="text-sm font-semibold" style={{ color: t.text }}>{new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
@@ -621,7 +641,7 @@ function DashboardContent() {
                   <option value="alpha">Sort: A–Z</option>
                 </select>
                 <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }}
-                  className="text-sm px-3 py-2 rounded-xl font-medium border transition-all"
+                  className="text-sm px-3 py-2 rounded-xl font-medium border transition-all cursor-pointer"
                   style={{ background: dateFilter === new Date().toISOString().split("T")[0] ? t.accent : t.surface, color: dateFilter === new Date().toISOString().split("T")[0] ? t.accentText : t.textMuted, borderColor: t.border }}>
                   Today
                 </button>
@@ -648,7 +668,7 @@ function DashboardContent() {
                         <div key={task.id} className="task-card p-4 rounded-2xl" style={{ background: t.surface, border: `1px solid ${task.done ? t.border : t.borderStrong}`, opacity: task.done ? 0.6 : 1 }}>
                           <div className="flex items-start gap-3">
                             <button onClick={() => toggleDone(task.id)}
-                              className="mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                              className="mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all cursor-pointer"
                               style={{ borderColor: task.done ? t.accent : t.borderStrong, background: task.done ? t.accent : "transparent" }}>
                               {task.done && <svg width="12" height="12" viewBox="0 0 12 12"><path d="M2 6l3 3 5-5" stroke={t.accentText} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" /></svg>}
                             </button>
@@ -681,9 +701,9 @@ function DashboardContent() {
                                       <option value="in_progress">In Progress</option>
                                     </select>
                                   )}
-                                  <button onClick={() => handleEdit(task)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs" style={{ background: t.surfaceHover, color: t.textMuted }}>✎</button>
-                                  <button onClick={() => archiveTask(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs" style={{ background: t.surfaceHover, color: t.textMuted }} title="Archive">📦</button>
-                                  <button onClick={() => deleteTask(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs" style={{ background: t.surfaceHover, color: t.danger }}>🗑</button>
+                                  <button onClick={() => handleEdit(task)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer" style={{ background: t.surfaceHover, color: t.textMuted }}>✎</button>
+                                  <button onClick={() => archiveTask(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer" style={{ background: t.surfaceHover, color: t.textMuted }} title="Archive">📦</button>
+                                  <button onClick={() => deleteTask(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer" style={{ background: t.surfaceHover, color: t.danger }}>🗑</button>
                                 </div>
                               </div>
                             </div>
@@ -738,7 +758,7 @@ function DashboardContent() {
 
       {/* FAB */}
       <button onClick={() => { resetForm(); setShowModal(true); }}
-        className="fixed bottom-8 right-8 w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold transition-all hover:scale-110 active:scale-95 shadow-2xl"
+        className="fixed bottom-8 right-8 w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold transition-all hover:scale-110 active:scale-95 shadow-2xl cursor-pointer"
         style={{ background: t.accent, color: t.accentText, boxShadow: `0 0 30px ${t.accent}50` }}>+</button>
 
       {/* Task Modal */}

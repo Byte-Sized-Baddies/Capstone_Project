@@ -38,6 +38,8 @@ const NAV_ITEMS = [
   { href: "/statistics", label: "Statistics", icon: "📊", active: false },
   { href: "/archive", label: "Archive", icon: "📦", active: false },
   { href: "/timeblocking", label: "Time Block", icon: "⏱", active: true },
+  { href: "/notes", label: "Notes", icon: "📝", active: false },
+  { href: "/integrations", label: "Integrations", icon: "🔌", active: false },
   { href: "/settings", label: "Settings", icon: "⚙️", active: false },
 ];
 

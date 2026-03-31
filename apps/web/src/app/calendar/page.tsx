@@ -342,6 +342,8 @@ export default function CalendarPage() {
               { href: "/statistics", label: "Statistics", icon: "📊", active: false },
               { href: "/archive", label: "Archive", icon: "📦", active: false },
               { href: "/timeblocking", label: "Time Block", icon: "⏱", active: false },
+              { href: "/notes", label: "Notes", icon: "📝", active: false },
+              { href: "/integrations", label: "Integrations", icon: "🔌", active: false },
               { href: "/settings", label: "Settings", icon: "⚙️", active: false },
             ].map(item => (
               <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"

@@ -33,6 +33,8 @@ const NAV_ITEMS = [
   { href: "/statistics", label: "Statistics", icon: "📊", active: false },
   { href: "/archive", label: "Archive", icon: "📦", active: true },
   { href: "/timeblocking", label: "Time Block", icon: "⏱", active: false },
+  { href: "/notes", label: "Notes", icon: "📝", active: false },
+  { href: "/integrations", label: "Integrations", icon: "🔌", active: false },
   { href: "/settings", label: "Settings", icon: "⚙️", active: false },
 ];
 

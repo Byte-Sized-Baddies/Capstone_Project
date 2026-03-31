@@ -1,6 +1,6 @@
 // app/timeblocking/page.tsx
 "use client";
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase, getSessionSafe } from "../auth/supabaseClient";
 
@@ -72,10 +72,22 @@ export default function TimeBlockingPage() {
   const [blocks, setBlocks] = useState<TimeBlock[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
 
+  // Mobile tab state
+  const [mobileTab, setMobileTab] = useState<"tasks" | "schedule">("schedule");
+
+  // Drag state (also mirrored in refs for document-level touch listeners)
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
   const [draggingBlock, setDraggingBlock] = useState<TimeBlock | null>(null);
   const [dragOverHour, setDragOverHour] = useState<number | null>(null);
   const [dragOverMin, setDragOverMin] = useState<number>(0);
+
+  // Refs for touch drag — avoids stale closures in document listeners
+  const draggingTaskRef = useRef<Task | null>(null);
+  const draggingBlockRef = useRef<TimeBlock | null>(null);
+  const dragOverHourRef = useRef<number | null>(null);
+  const dragOverMinRef = useRef<number>(0);
+  const blocksRef = useRef<TimeBlock[]>([]);
+  const isTouchDraggingRef = useRef(false);
 
   const [pendingTask, setPendingTask] = useState<Task | null>(null);
   const [pendingHour, setPendingHour] = useState(0);
@@ -88,6 +100,9 @@ export default function TimeBlockingPage() {
   const [conflictDays, setConflictDays] = useState<string[]>([]);
 
   const scheduleRef = useRef<HTMLDivElement>(null);
+
+  // Keep blocksRef in sync
+  useEffect(() => { blocksRef.current = blocks; }, [blocks]);
 
   useEffect(() => { const saved = localStorage.getItem("theme"); if (saved) setIsDark(saved === "dark"); }, []);
   const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
@@ -149,6 +164,7 @@ export default function TimeBlockingPage() {
 
   const saveBlocks = (newBlocks: TimeBlock[]) => {
     setBlocks(newBlocks);
+    blocksRef.current = newBlocks;
     localStorage.setItem(`timeblocks_${selectedDate}`, JSON.stringify(newBlocks));
   };
 
@@ -177,8 +193,18 @@ export default function TimeBlockingPage() {
     return days;
   };
 
-  const handleTaskDragStart = (e: React.DragEvent, task: Task) => { setDraggingTask(task); setDraggingBlock(null); e.dataTransfer.effectAllowed = "copy"; };
-  const handleBlockDragStart = (e: React.DragEvent, block: TimeBlock) => { e.stopPropagation(); setDraggingBlock(block); setDraggingTask(null); e.dataTransfer.effectAllowed = "move"; };
+  // ----- HTML5 drag handlers -----
+  const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
+    setDraggingTask(task); draggingTaskRef.current = task;
+    setDraggingBlock(null); draggingBlockRef.current = null;
+    e.dataTransfer.effectAllowed = "copy";
+  };
+  const handleBlockDragStart = (e: React.DragEvent, block: TimeBlock) => {
+    e.stopPropagation();
+    setDraggingBlock(block); draggingBlockRef.current = block;
+    setDraggingTask(null); draggingTaskRef.current = null;
+    e.dataTransfer.effectAllowed = "move";
+  };
 
   const handleScheduleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -199,13 +225,13 @@ export default function TimeBlockingPage() {
     const m = dragOverMin;
     if (draggingBlock) {
       saveBlocks(blocks.map(b => b.id === draggingBlock.id ? { ...b, startHour: h, startMin: m } : b));
-      setDraggingBlock(null);
+      setDraggingBlock(null); draggingBlockRef.current = null;
     } else if (draggingTask) {
       const scheduled = getTaskScheduledDays(draggingTask.id);
       setPendingTask(draggingTask); setPendingHour(h); setPendingMin(m);
       setDurationHrs(1); setDurationMins(0);
       setBlockColor(BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)]);
-      setDraggingTask(null);
+      setDraggingTask(null); draggingTaskRef.current = null;
       if (scheduled.length > 0) {
         setConflictDays(scheduled);
         setShowConflictModal(true);
@@ -214,7 +240,115 @@ export default function TimeBlockingPage() {
       }
     }
     setDragOverHour(null);
+    dragOverHourRef.current = null;
   };
+
+  // ----- Touch drag handlers -----
+  // Compute snapped hour/min from a raw Y position relative to the schedule container
+  const computeHourMin = useCallback((clientY: number) => {
+    if (!scheduleRef.current) return { h: 9, m: 0 };
+    const rect = scheduleRef.current.getBoundingClientRect();
+    const y = clientY - rect.top + scheduleRef.current.scrollTop;
+    const totalMins = (y / HOUR_HEIGHT) * 60;
+    const snapped = Math.round(totalMins / 15) * 15;
+    const h = Math.min(Math.floor(snapped / 60), 23);
+    const m = Math.min(snapped % 60, 45);
+    return { h, m };
+  }, []);
+
+  const handleTaskTouchStart = useCallback((_e: React.TouchEvent, task: Task) => {
+    // Don't prevent default on touchstart so scroll still works when not dragging;
+    // We mark ourselves as the active drag source.
+    isTouchDraggingRef.current = true;
+    draggingTaskRef.current = task;
+    draggingBlockRef.current = null;
+    setDraggingTask(task);
+    setDraggingBlock(null);
+  }, []);
+
+  const handleBlockTouchStart = useCallback((e: React.TouchEvent, block: TimeBlock) => {
+    e.stopPropagation();
+    isTouchDraggingRef.current = true;
+    draggingBlockRef.current = block;
+    draggingTaskRef.current = null;
+    setDraggingBlock(block);
+    setDraggingTask(null);
+  }, []);
+
+  // Document-level touch listeners (attached once on mount)
+  useEffect(() => {
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isTouchDraggingRef.current) return;
+      e.preventDefault(); // prevent page scroll while dragging
+      const touch = e.touches[0];
+      if (!scheduleRef.current) return;
+      const rect = scheduleRef.current.getBoundingClientRect();
+      if (
+        touch.clientX >= rect.left && touch.clientX <= rect.right &&
+        touch.clientY >= rect.top && touch.clientY <= rect.bottom
+      ) {
+        const { h, m } = computeHourMin(touch.clientY);
+        dragOverHourRef.current = h;
+        dragOverMinRef.current = m;
+        setDragOverHour(h);
+        setDragOverMin(m);
+      }
+    };
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (!isTouchDraggingRef.current) return;
+      isTouchDraggingRef.current = false;
+
+      const touch = e.changedTouches[0];
+      // Check if finger lifted over the schedule area
+      const el = document.elementFromPoint(touch.clientX, touch.clientY);
+      const scheduleEl = scheduleRef.current;
+      const overSchedule = scheduleEl && (scheduleEl === el || scheduleEl.contains(el as Node));
+
+      if (overSchedule) {
+        const h = dragOverHourRef.current ?? 9;
+        const m = dragOverMinRef.current;
+        const currentDraggingBlock = draggingBlockRef.current;
+        const currentDraggingTask = draggingTaskRef.current;
+
+        if (currentDraggingBlock) {
+          saveBlocks(blocksRef.current.map(b =>
+            b.id === currentDraggingBlock.id ? { ...b, startHour: h, startMin: m } : b
+          ));
+          setDraggingBlock(null); draggingBlockRef.current = null;
+        } else if (currentDraggingTask) {
+          const scheduled = getTaskScheduledDays(currentDraggingTask.id);
+          setPendingTask(currentDraggingTask); setPendingHour(h); setPendingMin(m);
+          setDurationHrs(1); setDurationMins(0);
+          setBlockColor(BLOCK_COLORS[Math.floor(Math.random() * BLOCK_COLORS.length)]);
+          setDraggingTask(null); draggingTaskRef.current = null;
+          if (scheduled.length > 0) {
+            setConflictDays(scheduled);
+            setShowConflictModal(true);
+          } else {
+            setShowDurationModal(true);
+          }
+          // Switch to schedule tab on mobile so the block is visible
+          setMobileTab("schedule");
+        }
+      } else {
+        // Dropped outside schedule — cancel drag
+        setDraggingTask(null); draggingTaskRef.current = null;
+        setDraggingBlock(null); draggingBlockRef.current = null;
+      }
+
+      setDragOverHour(null);
+      dragOverHourRef.current = null;
+    };
+
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
+    document.addEventListener("touchend", onTouchEnd);
+    return () => {
+      document.removeEventListener("touchmove", onTouchMove);
+      document.removeEventListener("touchend", onTouchEnd);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [computeHourMin, selectedDate]);
 
   const handleConflictChoice = (choice: "split" | "move") => {
     if (choice === "move") {
@@ -277,12 +411,86 @@ export default function TimeBlockingPage() {
     ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
     select option { background: ${t.surface}; color: ${t.text}; }
     input[type="date"]::-webkit-calendar-picker-indicator { filter: ${isDark ? "invert(1)" : "none"}; }
+    .block-delete-btn { opacity: 1; }
+    @media (hover: hover) and (pointer: fine) {
+      .block-delete-btn { opacity: 0; }
+      .group:hover .block-delete-btn { opacity: 1; }
+    }
   `;
 
   if (!authReady) return (
     <div className="min-h-screen flex items-center justify-center" style={{ background: t.bg }}>
       <div className="text-center"><div className="text-5xl mb-4">🐝</div><div className="text-sm font-medium" style={{ color: t.textDim }}>Loading your schedule...</div></div>
     </div>
+  );
+
+  // Task panel content — shared between desktop sidebar and mobile tab view
+  const taskPanelContent = (
+    <>
+      <div className="p-4" style={{ borderBottom: `1px solid ${t.border}` }}>
+        <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Your Tasks</div>
+        <div className="text-xs" style={{ color: t.textDim }}>
+          <span className="hidden md:inline">Drag tasks onto the schedule →</span>
+          <span className="md:hidden">Tap & hold, then drag to schedule tab</span>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto p-3 space-y-2">
+        {tasks.length === 0 ? (
+          <div className="py-12 text-center">
+            <div className="text-3xl mb-2">📝</div>
+            <p className="text-xs" style={{ color: t.textDim }}>No tasks yet</p>
+            <a href="/dashboard" className="text-xs font-semibold mt-2 block" style={{ color: t.accent }}>Go to Dashboard →</a>
+          </div>
+        ) : (
+          <>
+            {unscheduledTasks.length > 0 && (
+              <div>
+                <div className="text-xs font-semibold px-1 mb-2" style={{ color: t.textDim }}>UNSCHEDULED ({unscheduledTasks.length})</div>
+                {unscheduledTasks.map(task => {
+                  const pc = priorityColor(task.priority, isDark);
+                  return (
+                    <div key={task.id} className="task-chip p-3 rounded-xl mb-2"
+                      draggable
+                      onDragStart={e => handleTaskDragStart(e, task)}
+                      onTouchStart={e => handleTaskTouchStart(e, task)}
+                      style={{ background: t.surfaceHover, border: `1px solid ${t.border}`, borderLeft: `3px solid ${pc}` }}>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: pc }} />
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold truncate" style={{ color: task.done ? t.textDim : t.text, textDecoration: task.done ? "line-through" : "none" }}>{task.text}</div>
+                          {task.due && <div className="text-xs mt-0.5" style={{ color: t.textDim }}>📅 {task.due}</div>}
+                          <div className="text-xs mt-0.5" style={{ color: t.textDim }}>{task.category}</div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            {tasks.filter(tk => scheduledTaskIds.has(tk.id)).length > 0 && (
+              <div>
+                <div className="text-xs font-semibold px-1 mb-2 mt-4" style={{ color: t.textDim }}>SCHEDULED ({tasks.filter(tk => scheduledTaskIds.has(tk.id)).length})</div>
+                {tasks.filter(tk => scheduledTaskIds.has(tk.id)).map(task => {
+                  const pc = priorityColor(task.priority, isDark);
+                  return (
+                    <div key={task.id} className="task-chip p-3 rounded-xl mb-2 opacity-60"
+                      draggable
+                      onDragStart={e => handleTaskDragStart(e, task)}
+                      onTouchStart={e => handleTaskTouchStart(e, task)}
+                      style={{ background: t.surfaceHover, border: `1px solid ${t.border}`, borderLeft: `3px solid ${pc}` }}>
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs mt-0.5">✓</span>
+                        <div className="text-xs font-semibold truncate" style={{ color: t.textDim }}>{task.text}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </>
   );
 
   return (
@@ -339,83 +547,63 @@ export default function TimeBlockingPage() {
         </div>
       </header>
 
-      <div className="flex h-[calc(100vh-73px)]">
-        {/* TASK PANEL */}
-        <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden slide-up" style={{ background: t.surface, borderRight: `1px solid ${t.border}` }}>
-          <div className="p-4" style={{ borderBottom: `1px solid ${t.border}` }}>
-            <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Your Tasks</div>
-            <div className="text-xs" style={{ color: t.textDim }}>Drag tasks onto the schedule →</div>
-          </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-2">
-            {tasks.length === 0 ? (
-              <div className="py-12 text-center">
-                <div className="text-3xl mb-2">📝</div>
-                <p className="text-xs" style={{ color: t.textDim }}>No tasks yet</p>
-                <a href="/dashboard" className="text-xs font-semibold mt-2 block" style={{ color: t.accent }}>Go to Dashboard →</a>
-              </div>
-            ) : (
-              <>
-                {unscheduledTasks.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold px-1 mb-2" style={{ color: t.textDim }}>UNSCHEDULED ({unscheduledTasks.length})</div>
-                    {unscheduledTasks.map(task => {
-                      const pc = priorityColor(task.priority, isDark);
-                      return (
-                        <div key={task.id} className="task-chip p-3 rounded-xl mb-2" draggable onDragStart={e => handleTaskDragStart(e, task)}
-                          style={{ background: t.surfaceHover, border: `1px solid ${t.border}`, borderLeft: `3px solid ${pc}` }}>
-                          <div className="flex items-start gap-2">
-                            <div className="w-2 h-2 rounded-full mt-1.5 flex-shrink-0" style={{ background: pc }} />
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold truncate" style={{ color: task.done ? t.textDim : t.text, textDecoration: task.done ? "line-through" : "none" }}>{task.text}</div>
-                              {task.due && <div className="text-xs mt-0.5" style={{ color: t.textDim }}>📅 {task.due}</div>}
-                              <div className="text-xs mt-0.5" style={{ color: t.textDim }}>{task.category}</div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {tasks.filter(tk => scheduledTaskIds.has(tk.id)).length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold px-1 mb-2 mt-4" style={{ color: t.textDim }}>SCHEDULED ({tasks.filter(tk => scheduledTaskIds.has(tk.id)).length})</div>
-                    {tasks.filter(tk => scheduledTaskIds.has(tk.id)).map(task => {
-                      const pc = priorityColor(task.priority, isDark);
-                      return (
-                        <div key={task.id} className="task-chip p-3 rounded-xl mb-2 opacity-60" draggable onDragStart={e => handleTaskDragStart(e, task)}
-                          style={{ background: t.surfaceHover, border: `1px solid ${t.border}`, borderLeft: `3px solid ${pc}` }}>
-                          <div className="flex items-start gap-2">
-                            <span className="text-xs mt-0.5">✓</span>
-                            <div className="text-xs font-semibold truncate" style={{ color: t.textDim }}>{task.text}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+      {/* MOBILE TABS — only visible on small screens */}
+      <div className="md:hidden flex border-b" style={{ background: t.surface, borderColor: t.border }}>
+        <button
+          onClick={() => setMobileTab("tasks")}
+          className="flex-1 py-3 text-sm font-semibold transition-colors"
+          style={{
+            color: mobileTab === "tasks" ? t.accent : t.textMuted,
+            borderBottom: mobileTab === "tasks" ? `2px solid ${t.accent}` : "2px solid transparent",
+          }}>
+          📝 Tasks
+        </button>
+        <button
+          onClick={() => setMobileTab("schedule")}
+          className="flex-1 py-3 text-sm font-semibold transition-colors"
+          style={{
+            color: mobileTab === "schedule" ? t.accent : t.textMuted,
+            borderBottom: mobileTab === "schedule" ? `2px solid ${t.accent}` : "2px solid transparent",
+          }}>
+          ⏱ Schedule
+        </button>
+      </div>
+
+      <div className="flex h-[calc(100vh-73px)] md:h-[calc(100vh-73px)]">
+        {/* TASK PANEL — hidden on mobile when schedule tab is active */}
+        <div
+          className={`flex-shrink-0 flex flex-col overflow-hidden slide-up
+            ${mobileTab === "tasks" ? "flex w-full md:w-72" : "hidden md:flex md:w-72"}`}
+          style={{ background: t.surface, borderRight: `1px solid ${t.border}` }}>
+          {taskPanelContent}
         </div>
 
-        {/* SCHEDULE */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        {/* SCHEDULE — hidden on mobile when tasks tab is active */}
+        <div className={`flex-col overflow-hidden
+          ${mobileTab === "schedule" ? "flex flex-1" : "hidden md:flex md:flex-1"}`}>
           {/* Date nav */}
-          <div className="px-6 py-3 flex items-center justify-between flex-shrink-0" style={{ borderBottom: `1px solid ${t.border}`, background: t.bg }}>
-            <div className="flex items-center gap-3">
-              <button onClick={() => goDay(-1)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>←</button>
-              <button onClick={() => setSelectedDate(today)} className="px-3 py-1.5 rounded-lg text-xs font-semibold"
+          <div className="px-4 md:px-6 py-3 flex items-center justify-between flex-shrink-0 flex-wrap gap-2"
+            style={{ borderBottom: `1px solid ${t.border}`, background: t.bg }}>
+            <div className="flex items-center gap-2 md:gap-3 min-w-0">
+              <button onClick={() => goDay(-1)} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>←</button>
+              <button onClick={() => setSelectedDate(today)} className="px-3 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
                 style={{ background: selectedDate === today ? t.accent : t.surface, color: selectedDate === today ? t.accentText : t.textMuted, border: `1px solid ${t.border}` }}>Today</button>
-              <button onClick={() => goDay(1)} className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>→</button>
-              <div>
-                <div className="text-base font-bold" style={{ color: t.text }}>{dateLabel}</div>
+              <button onClick={() => goDay(1)} className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>→</button>
+              <div className="min-w-0">
+                <div className="text-sm md:text-base font-bold truncate" style={{ color: t.text }}>{dateLabel}</div>
                 {blocks.length > 0 && <div className="text-xs" style={{ color: t.textDim }}>{blocks.length} block{blocks.length !== 1 ? "s" : ""} scheduled</div>}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)} className="px-3 py-1.5 rounded-xl text-sm outline-none" style={{ background: t.surface, color: t.text, border: `1px solid ${t.border}` }} />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <input type="date" value={selectedDate} onChange={e => setSelectedDate(e.target.value)}
+                className="px-2 md:px-3 py-1.5 rounded-xl text-xs md:text-sm outline-none"
+                style={{ background: t.surface, color: t.text, border: `1px solid ${t.border}` }} />
               {blocks.length > 0 && (
-                <button onClick={() => { if (confirm("Clear all blocks for this day?")) saveBlocks([]); }} className="px-3 py-1.5 rounded-xl text-xs font-medium" style={{ background: t.danger + "20", color: t.danger }}>Clear day</button>
+                <button onClick={() => { if (confirm("Clear all blocks for this day?")) saveBlocks([]); }}
+                  className="px-2 md:px-3 py-1.5 rounded-xl text-xs font-medium"
+                  style={{ background: t.danger + "20", color: t.danger }}>Clear</button>
               )}
             </div>
           </div>
@@ -452,7 +640,10 @@ export default function TimeBlockingPage() {
               const topPx = (block.startHour * 60 + block.startMin) / 60 * HOUR_HEIGHT;
               const heightPx = Math.max(block.durationMins / 60 * HOUR_HEIGHT, 28);
               return (
-                <div key={block.id} className="block-item absolute rounded-xl overflow-hidden z-10 group" draggable onDragStart={e => handleBlockDragStart(e, block)}
+                <div key={block.id} className="block-item absolute rounded-xl overflow-hidden z-10 group"
+                  draggable
+                  onDragStart={e => handleBlockDragStart(e, block)}
+                  onTouchStart={e => handleBlockTouchStart(e, block)}
                   style={{ top: topPx + 1, left: 68, right: 12, height: heightPx - 2, background: block.color, cursor: "grab" }}>
                   <div className="p-2 h-full flex flex-col justify-between" style={{ background: "rgba(0,0,0,0.15)" }}>
                     <div>
@@ -461,8 +652,9 @@ export default function TimeBlockingPage() {
                     </div>
                     {heightPx > 56 && task.category && <div className="text-xs text-white opacity-70 truncate">{task.category}</div>}
                   </div>
-                  <button onClick={e => { e.stopPropagation(); removeBlock(block.id); }}
-                    className="absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+                  <button
+                    onClick={e => { e.stopPropagation(); removeBlock(block.id); }}
+                    className="block-delete-btn absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs transition-opacity"
                     style={{ background: "rgba(0,0,0,0.4)", color: "white" }}>✕</button>
                 </div>
               );

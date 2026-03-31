@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --no-lint",
     "start": "next start",
     "lint": "next lint"
   },
@@ -15,6 +15,12 @@
     "@repo/lib": "workspace:*",
     "@repo/ui": "workspace:*",
     "@supabase/supabase-js": "^2.76.1",
+    "@tiptap/extension-image": "^3.21.0",
+    "@tiptap/extension-link": "^3.21.0",
+    "@tiptap/extension-placeholder": "^3.21.0",
+    "@tiptap/pm": "^3.21.0",
+    "@tiptap/react": "^3.21.0",
+    "@tiptap/starter-kit": "^3.21.0",
     "next": "15.5.6",
     "react": "19.1.0",
     "react-dom": "19.1.0",
@@ -27,7 +33,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "15.5.6",
+    "eslint-config-next": "^15.5.6",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

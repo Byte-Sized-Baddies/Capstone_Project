@@ -36,7 +36,7 @@ type EditTaskModalProps = {
         dueTime?: string | null;
         priority?: TaskPriority;
         attachments?: TaskAttachment[];
-        projectId?: string | null;
+        projectId?: number | null;
     }) => void;
     onDelete: (taskId: string) => Promise<void> | void;
 
@@ -59,7 +59,7 @@ export default function EditTaskModal({
     const [attachments, setAttachments] = useState<TaskAttachment[]>(
         task.attachments ?? []
     );
-    const [projectId, setProjectId] = useState<string | null>(
+    const [projectId, setProjectId] = useState<number | null>(
         task.projectId ?? null
     );
 

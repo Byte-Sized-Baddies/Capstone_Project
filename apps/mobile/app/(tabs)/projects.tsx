@@ -50,11 +50,18 @@ export default function ProjectsScreen() {
         return tasks.filter((t) => t.projectId === activeProject.id);
     }, [tasks, activeProject]);
 
+<<<<<<< HEAD
     // 4. Action Handlers
     const handleCreate = () => {
         if (!projectName.trim()) return;
         // Call the context function directly
         createProject(projectName.trim(), selectedColor, selectedIcon);
+=======
+    const handleCreate = async () => {
+        if (!projectName.trim()) return;
+        const created = await createProject(projectName, selectedColor, selectedIcon);
+        if (!created) return;
+>>>>>>> 55b156446f462b14be04b211270d4b4ae232fa5c
         setProjectName("");
         setSelectedColor(COLOR_CHOICES[0]);
         setSelectedIcon(ICON_CHOICES[0]);

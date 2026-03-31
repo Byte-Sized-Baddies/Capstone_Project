@@ -29,9 +29,13 @@ export default function AddTaskModal() {
   const [dueTime, setDueTime] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("low");
   const [category, setCategory] = useState("School");
+<<<<<<< HEAD
   const [projectId, setProjectId] = useState<string | null>(activeProjectId);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+=======
+  const [projectId, setProjectId] = useState<number | null>(activeProjectId);
+>>>>>>> 55b156446f462b14be04b211270d4b4ae232fa5c
 
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
   const [dateValue, setDateValue] = useState(new Date());

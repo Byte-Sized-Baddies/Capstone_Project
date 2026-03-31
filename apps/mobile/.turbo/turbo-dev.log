@@ -1,48 +1,23 @@
 
-> @repo/mobile@1.0.0 dev /Users/mia/Desktop/do-bee/apps/mobile
+> @repo/mobile@1.0.0 dev C:\Users\2uyya\OneDrive\Documents\GitHub\Capstone_Project\apps\mobile
 > expo start -c
 
-[90menv: load .env[39m
-[90menv: export EXPO_PUBLIC_SUPABASE_URL EXPO_PUBLIC_SUPABASE_ANON_KEY[39m
-[90mStarting project at /Users/mia/Desktop/do-bee/apps/mobile[39m
-[2mStarting Metro Bundler[22m
-[33mwarning[39m: Bundler cache is empty, rebuilding [2m(this may take a minute)[22m
-[33mThe following packages should be updated for best compatibility with the installed [1mexpo[22m version:[39m
-[33m  [1m@react-native-picker/picker[22m[36m@[39m[33m[31m2.11.4[39m[33m - expected version: [32m2.11.1[39m[33m[39m
-[33mYour project may not work correctly until you install the expected versions of the packages.[39m
-▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
-█ ▄▄▄▄▄ █▄▄▄ ▀▄▀█▄█ ▄▄▄▄▄ █
-█ █   █ ██▄▀ █  █▄█ █   █ █
-█ █▄▄▄█ ██▀▄ ▄▀▀█▀█ █▄▄▄█ █
-█▄▄▄▄▄▄▄█ ▀▄█ ▀ ▀ █▄▄▄▄▄▄▄█
-█ ▄▀▄▄▀▄▀█▄▀█▄▀█▀ █▄█▀█▀▀▄█
-█▀▀█▀▀▀▄▀ ▄██▄▄▄▄ ▀███▄▀▀ █
-█ ██ ▀ ▄██▄ █▀█▄ █ ▄▀▀█▀ ██
-█ ▄  ▀▀▄ █▄▀█▀▄▀ ▄▀ ██▄▀  █
-█▄█▄██▄▄▄▀▀█ ▄▄ █ ▄▄▄  ▄▀▄█
-█ ▄▄▄▄▄ ██ ▀▀▄  █ █▄█ ███ █
-█ █   █ █  ▀▄ ▀█▄ ▄  ▄ █▀▀█
-█ █▄▄▄█ █▀ █ ▀█▄ ▄█▀▀▄█   █
-█▄▄▄▄▄▄▄█▄█▄▄██▄▄▄▄█▄▄███▄█
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
 
-› Metro waiting on [4mexp://192.168.1.236:8081[24m
-› Scan the QR code above with Expo Go (Android) or the Camera app (iOS)
+Error: Cannot find module 'C:\Users\2uyya\OneDrive\Documents\GitHub\Capstone_Project\apps\mobile\node_modules\expo\bin\cli'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+ ELIFECYCLE  Command failed with exit code 1.
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
 
-› Web is waiting on [4mhttp://localhost:8081[24m
-
-› Using [36mExpo Go[39m
-› Press [1ms[22m [2m│[22m switch to development build
-
-› Press [1ma[22m [2m│[22m open Android
-› Press [1mi[22m [2m│[22m open iOS simulator
-› Press [1mw[22m [2m│[22m open web
-
-› Press [1mj[22m [2m│[22m open debugger
-› Press [1mr[22m [2m│[22m reload app
-› Press [1mm[22m [2m│[22m toggle menu
-› [1mshift+m[22m [2m│[22m more tools
-› Press [1mo[22m [2m│[22m open project code in your editor
-
-› Press [1m?[22m [2m│[22m show all commands
-
-Logs for your project will appear below.[2m Press Ctrl+C to exit.[22m
+Node.js v24.13.0

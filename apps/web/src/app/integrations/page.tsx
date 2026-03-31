@@ -54,9 +54,6 @@ export default function IntegrationsPage() {
   const [gmailLoading, setGmailLoading] = useState(false);
   const [gmailTaskCreating, setGmailTaskCreating] = useState<string | null>(null);
 
-  // Outlook state
-  const [outlookSyncing, setOutlookSyncing] = useState(false);
-  const [outlookSyncResult, setOutlookSyncResult] = useState<string | null>(null);
 
   useEffect(() => { const s = localStorage.getItem("theme"); if (s) setIsDark(s === "dark"); }, []);
   const toggleTheme = () => setIsDark(p => { localStorage.setItem("theme", !p ? "dark" : "light"); return !p; });
@@ -73,13 +70,13 @@ export default function IntegrationsPage() {
         const params = new URLSearchParams(window.location.search);
         const gcalConnected = params.get("gcal");
         const gmailConnected = params.get("gmail");
-        const outlookConnected = params.get("outlook");
+
         const err = params.get("error");
         if (gcalConnected === "connected") setStatusMsg("✅ Google Calendar connected successfully!");
         if (gmailConnected === "connected") setStatusMsg("✅ Gmail connected successfully!");
-        if (outlookConnected === "connected") setStatusMsg("✅ Microsoft Outlook connected successfully!");
+
         if (err) setStatusMsg(`❌ Connection error: ${err}`);
-        if (gcalConnected || gmailConnected || outlookConnected || err) window.history.replaceState({}, "", "/integrations");
+        if (gcalConnected || gmailConnected || err) window.history.replaceState({}, "", "/integrations");
       } catch (e) {
         console.error("Auth check failed:", e);
       } finally {
@@ -169,31 +166,9 @@ export default function IntegrationsPage() {
     setGmailTaskCreating(null);
   };
 
-  // ── MICROSOFT OUTLOOK ────────────────────────────────────────────────────────
-  const connectOutlook = () => { window.location.href = `/api/auth/microsoft?userId=${userId}`; };
-  const disconnectOutlook = async () => {
-    if (!userId || !confirm("Disconnect Microsoft Outlook?")) return;
-    await supabase.from("integrations_v2").delete().eq("user_id", userId).eq("service", "microsoft_outlook");
-    setIntegrations(prev => { const n = { ...prev }; delete n.microsoft_outlook; return n; });
-  };
-  const syncOutlook = async () => {
-    setOutlookSyncing(true); setOutlookSyncResult(null);
-    try {
-      const res = await fetch("/api/integrations/outlook/sync", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      if (res.ok) setOutlookSyncResult(`✅ Synced ${data.synced} task${data.synced !== 1 ? "s" : ""} to Outlook`);
-      else setOutlookSyncResult(`❌ Sync failed: ${data.error}`);
-    } catch { setOutlookSyncResult("❌ Sync failed — check your connection"); }
-    setOutlookSyncing(false);
-  };
-
   const gcal = integrations.google_calendar;
   const gmail = integrations.gmail;
-  const outlook = integrations.microsoft_outlook;
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-  const microsoftClientId = process.env.NEXT_PUBLIC_MICROSOFT_CLIENT_ID;
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -371,54 +346,6 @@ export default function IntegrationsPage() {
           )}
         </div>
 
-        {/* ── MICROSOFT OUTLOOK ── */}
-        <div className="rounded-2xl p-6 mb-4" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background: t.surfaceHover }}>🗓️</div>
-              <div>
-                <div className="font-bold" style={{ color: t.text }}>Microsoft Outlook</div>
-                <div className="text-xs mt-0.5" style={{ color: t.textDim }}>Sync tasks with due dates to Outlook calendar</div>
-              </div>
-            </div>
-            <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: outlook ? t.success + "20" : t.surfaceHover, color: outlook ? t.success : t.textDim }}>
-              {outlook ? "● Connected" : "Not connected"}
-            </span>
-          </div>
-          {outlook ? (
-            <div className="space-y-3">
-              {outlookSyncResult && (
-                <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: outlookSyncResult.startsWith("✅") ? t.success : t.danger }}>{outlookSyncResult}</div>
-              )}
-              <div className="flex gap-2">
-                <button onClick={syncOutlook} disabled={outlookSyncing} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                  style={{ background: t.accent, color: t.accentText, opacity: outlookSyncing ? 0.6 : 1 }}>
-                  {outlookSyncing ? "Syncing…" : "↻ Sync now"}
-                </button>
-                <button onClick={disconnectOutlook} className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Disconnect</button>
-              </div>
-            </div>
-          ) : (
-            !microsoftClientId ? (
-              <div className="rounded-xl p-4 text-sm" style={{ background: t.surfaceHover, color: t.textMuted }}>
-                <p className="font-semibold mb-2" style={{ color: t.text }}>Setup required (one-time, ~5 mins)</p>
-                <ol className="space-y-1.5 list-decimal list-inside text-xs">
-                  <li>Go to <strong>portal.azure.com</strong> → App registrations → New registration</li>
-                  <li>Set redirect URI to: <code className="px-1 rounded" style={{ background: t.border }}>{typeof window !== "undefined" ? window.location.origin : "https://yourapp.vercel.app"}/api/auth/microsoft/callback</code></li>
-                  <li>Under Certificates & secrets → New client secret</li>
-                  <li>Under API permissions → Add <strong>Calendars.ReadWrite</strong> (Microsoft Graph)</li>
-                  <li>Add to Vercel env vars: <code className="px-1 rounded" style={{ background: t.border }}>NEXT_PUBLIC_MICROSOFT_CLIENT_ID</code> and <code className="px-1 rounded" style={{ background: t.border }}>MICROSOFT_CLIENT_SECRET</code></li>
-                  <li>Redeploy, then come back here</li>
-                </ol>
-              </div>
-            ) : (
-              <button onClick={connectOutlook} className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
-                style={{ background: "#0078D4", color: "white" }}>
-                <span>⊞</span> Connect Microsoft Outlook
-              </button>
-            )
-          )}
-        </div>
       </div>
     </main>
   );

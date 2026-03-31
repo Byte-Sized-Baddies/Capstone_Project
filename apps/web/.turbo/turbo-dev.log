@@ -1,24 +1,22 @@
 
-> web@0.1.0 dev /Users/mia/Desktop/do-bee/apps/web
+> web@0.1.0 dev C:\Users\2uyya\OneDrive\Documents\GitHub\Capstone_Project\apps\web
 > next dev
 
-   [1m[38;2;173;127;168m▲ Next.js 15.5.6[39m[22m
-   - Local:        http://localhost:3000
-   - Network:      http://192.168.1.236:3000
-   - Environments: .env.local
+node:internal/modules/cjs/loader:1424
+  throw err;
+  ^
 
- [32m[1m✓[22m[39m Starting...
- [32m[1m✓[22m[39m Ready in 1187ms
- [37m[1m○[22m[39m Compiling / ...
- [32m[1m✓[22m[39m Compiled / in 1481ms (563 modules)
- GET / [32m200[39m in 1713ms
- [37m[1m○[22m[39m Compiling /login ...
- [32m[1m✓[22m[39m Compiled /login in 1265ms (807 modules)
- GET /login [32m200[39m in 1401ms
- GET /login [32m200[39m in 15ms
-Supabase URL: https://your-project-id.supabase.co
-Supabase Key loaded? ✅
- GET /login [32m200[39m in 182ms
- [32m[1m✓[22m[39m Compiled /signup in 452ms (806 modules)
- GET /signup [32m200[39m in 544ms
-[?25h
+Error: Cannot find module 'C:\Users\2uyya\OneDrive\Documents\GitHub\Capstone_Project\apps\web\node_modules\next\dist\bin\next'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1421:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1059:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1064:22)
+    at Module._load (node:internal/modules/cjs/loader:1227:37)
+    at TracingChannel.traceSync (node:diagnostics_channel:328:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:245:24)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.13.0

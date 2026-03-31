@@ -29,7 +29,6 @@ const NAV_ITEMS = [
 ];
 
 interface Integration { service: string; config: any; enabled: boolean; }
-interface GmailEmail { id: string; subject: string; from: string; snippet: string; }
 
 export default function IntegrationsPage() {
   const router = useRouter();
@@ -49,12 +48,6 @@ export default function IntegrationsPage() {
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalSyncResult, setGcalSyncResult] = useState<string | null>(null);
 
-  // Gmail state
-  const [gmailEmails, setGmailEmails] = useState<GmailEmail[]>([]);
-  const [gmailLoading, setGmailLoading] = useState(false);
-  const [gmailTaskCreating, setGmailTaskCreating] = useState<string | null>(null);
-
-
   useEffect(() => { const s = localStorage.getItem("theme"); if (s) setIsDark(s === "dark"); }, []);
   const toggleTheme = () => setIsDark(p => { localStorage.setItem("theme", !p ? "dark" : "light"); return !p; });
 
@@ -69,14 +62,12 @@ export default function IntegrationsPage() {
 
         const params = new URLSearchParams(window.location.search);
         const gcalConnected = params.get("gcal");
-        const gmailConnected = params.get("gmail");
 
         const err = params.get("error");
         if (gcalConnected === "connected") setStatusMsg("✅ Google Calendar connected successfully!");
-        if (gmailConnected === "connected") setStatusMsg("✅ Gmail connected successfully!");
 
         if (err) setStatusMsg(`❌ Connection error: ${err}`);
-        if (gcalConnected || gmailConnected || err) window.history.replaceState({}, "", "/integrations");
+        if (gcalConnected || err) window.history.replaceState({}, "", "/integrations");
       } catch (e) {
         console.error("Auth check failed:", e);
       } finally {
@@ -131,44 +122,7 @@ export default function IntegrationsPage() {
     setGcalSyncing(false);
   };
 
-  // ── GMAIL ───────────────────────────────────────────────────────────────────
-  const connectGmail = () => { window.location.href = `/api/auth/gmail?userId=${userId}`; };
-  const disconnectGmail = async () => {
-    if (!userId || !confirm("Disconnect Gmail?")) return;
-    await supabase.from("integrations_v2").delete().eq("user_id", userId).eq("service", "gmail");
-    setIntegrations(prev => { const n = { ...prev }; delete n.gmail; return n; });
-    setGmailEmails([]);
-  };
-  const fetchGmailEmails = async () => {
-    setGmailLoading(true);
-    try {
-      const res = await fetch("/api/integrations/gmail/emails", {
-        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId }),
-      });
-      const data = await res.json();
-      if (res.ok) setGmailEmails(data.emails || []);
-      else setStatusMsg(`❌ Failed to load emails: ${data.error}`);
-    } catch { setStatusMsg("❌ Failed to load emails"); }
-    setGmailLoading(false);
-  };
-  const createTaskFromEmail = async (email: GmailEmail) => {
-    if (!userId) return;
-    setGmailTaskCreating(email.id);
-    await supabase.from("tasks_v2").insert({
-      user_id: userId,
-      title: email.subject,
-      description: email.snippet,
-      is_completed: false,
-      is_archived: false,
-    });
-    setStatusMsg(`✅ Task created: "${email.subject}"`);
-    setTimeout(() => setStatusMsg(null), 3000);
-    setGmailTaskCreating(null);
-  };
-
   const gcal = integrations.google_calendar;
-  const gmail = integrations.gmail;
-  const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -287,64 +241,6 @@ export default function IntegrationsPage() {
           )}
         </div>
 
-        {/* ── GMAIL ── */}
-        <div className="rounded-2xl p-6 mb-4" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-          <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl" style={{ background: t.surfaceHover }}>📧</div>
-              <div>
-                <div className="font-bold" style={{ color: t.text }}>Gmail</div>
-                <div className="text-xs mt-0.5" style={{ color: t.textDim }}>Turn emails into tasks</div>
-              </div>
-            </div>
-            <span className="text-xs px-3 py-1 rounded-full font-semibold" style={{ background: gmail ? t.success + "20" : t.surfaceHover, color: gmail ? t.success : t.textDim }}>
-              {gmail ? "● Connected" : "Not connected"}
-            </span>
-          </div>
-          {gmail ? (
-            <div className="space-y-3">
-              <div className="flex gap-2">
-                <button onClick={fetchGmailEmails} disabled={gmailLoading} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
-                  style={{ background: t.accent, color: t.accentText, opacity: gmailLoading ? 0.6 : 1 }}>
-                  {gmailLoading ? "Loading…" : "📥 Load unread emails"}
-                </button>
-                <button onClick={disconnectGmail} className="px-4 py-2.5 rounded-xl text-sm font-medium" style={{ background: t.surfaceHover, color: t.danger }}>Disconnect</button>
-              </div>
-              {gmailEmails.length > 0 && (
-                <div className="space-y-2 mt-2">
-                  {gmailEmails.map(email => (
-                    <div key={email.id} className="rounded-xl p-3 flex items-start justify-between gap-3" style={{ background: t.surfaceHover }}>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{email.subject}</div>
-                        <div className="text-xs truncate mt-0.5" style={{ color: t.textDim }}>{email.from}</div>
-                        <div className="text-xs mt-1 line-clamp-2" style={{ color: t.textMuted }}>{email.snippet}</div>
-                      </div>
-                      <button onClick={() => createTaskFromEmail(email)} disabled={gmailTaskCreating === email.id}
-                        className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
-                        style={{ background: t.accent, color: t.accentText, opacity: gmailTaskCreating === email.id ? 0.6 : 1 }}>
-                        {gmailTaskCreating === email.id ? "…" : "+ Task"}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-              {gmailEmails.length === 0 && !gmailLoading && (
-                <div className="text-xs text-center py-3" style={{ color: t.textDim }}>Click "Load unread emails" to see your inbox</div>
-              )}
-            </div>
-          ) : (
-            !googleClientId ? (
-              <div className="text-xs px-3 py-2 rounded-lg" style={{ background: t.surfaceHover, color: t.textDim }}>
-                Add <code>NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> to Vercel env vars to enable Gmail.
-              </div>
-            ) : (
-              <button onClick={connectGmail} className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
-                style={{ background: "#EA4335", color: "white" }}>
-                <span>✉</span> Connect Gmail
-              </button>
-            )
-          )}
-        </div>
 
       </div>
     </main>

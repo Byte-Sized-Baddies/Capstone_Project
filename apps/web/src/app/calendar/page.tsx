@@ -2,7 +2,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../auth/supabaseClient";
+import { supabase, getSessionSafe } from "../auth/supabaseClient";
 
 const darkTheme = {
   bg: "#111113", surface: "#18181b", surfaceHover: "#27272a",
@@ -58,13 +58,18 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session) { router.push("/login"); return; }
-      const user = data.session.user;
-      setUserId(user.id);
-      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
-      setDisplayName(name);
-      setAuthReady(true);
+      try {
+        const { data, error } = await getSessionSafe();
+        if (error || !data.session) { router.push("/login"); return; }
+        const user = data.session.user;
+        setUserId(user.id);
+        const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
+        setDisplayName(name);
+      } catch (e) {
+        console.error("Auth check failed:", e);
+      } finally {
+        setAuthReady(true);
+      }
     };
     const { data: authListener } = supabase.auth.onAuthStateChange(() => checkSession());
     checkSession();

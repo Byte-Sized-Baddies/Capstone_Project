@@ -5,7 +5,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import LinkExtension from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
-import { supabase } from "../auth/supabaseClient";
+import { supabase, getSessionSafe } from "../auth/supabaseClient";
 
 const darkTheme = {
   bg: "#111113", surface: "#18181b", surfaceHover: "#27272a",
@@ -71,12 +71,17 @@ function NotesContent() {
 
   useEffect(() => {
     const check = async () => {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) { router.push("/login"); return; }
-      setUserId(data.session.user.id);
-      const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split("@")[0] || "User";
-      setDisplayName(name);
-      setAuthReady(true);
+      try {
+        const { data } = await getSessionSafe();
+        if (!data.session) { router.push("/login"); return; }
+        setUserId(data.session.user.id);
+        const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split("@")[0] || "User";
+        setDisplayName(name);
+      } catch (e) {
+        console.error("Auth check failed:", e);
+      } finally {
+        setAuthReady(true);
+      }
     };
     const { data: l } = supabase.auth.onAuthStateChange(() => check());
     check();

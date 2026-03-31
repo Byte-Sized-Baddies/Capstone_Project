@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { supabase } from "../auth/supabaseClient";
+import { supabase, getSessionSafe } from "../auth/supabaseClient";
 import { signInWithEmail, signInWithOAuth } from "../auth/auth";
 import { FaGoogle, FaMicrosoft } from "react-icons/fa";
 
@@ -34,7 +34,7 @@ export default function LoginPage() {
     const getSession = async () => {
       await supabase.auth.refreshSession();
       await supabase.auth.signOut();
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await getSessionSafe();
       if (session) router.replace("/dashboard");
     };
     getSession();

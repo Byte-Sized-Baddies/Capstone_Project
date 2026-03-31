@@ -2,7 +2,7 @@
 "use client";
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { supabase } from "../auth/supabaseClient";
+import { supabase, getSessionSafe } from "../auth/supabaseClient";
 
 type Status = "not_started" | "in_progress";
 type Priority = "Low" | "Medium" | "High";
@@ -114,7 +114,7 @@ function DashboardContent() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
+      const { data, error } = await getSessionSafe();
       if (error || !data.session) { router.push("/login"); return; }
       const user = data.session.user;
       setUserEmail(user.email || "");

@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "../auth/supabaseClient";
+import { supabase, getSessionSafe } from "../auth/supabaseClient";
 
 const darkTheme = {
   bg: "#111113", surface: "#18181b", surfaceHover: "#27272a",
@@ -56,7 +56,7 @@ export default function IntegrationsPage() {
   useEffect(() => {
     const check = async () => {
       try {
-        const { data } = await supabase.auth.getSession();
+        const { data } = await getSessionSafe();
         if (!data.session) { router.push("/login"); return; }
         setUserId(data.session.user.id);
         const name = data.session.user.user_metadata?.full_name || data.session.user.email?.split("@")[0] || "User";

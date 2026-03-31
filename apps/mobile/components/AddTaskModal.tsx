@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 
 import {
   Modal,
@@ -34,6 +34,7 @@ export default function AddTaskModal() {
   const [showTimePicker, setShowTimePicker] = useState(false);
 
   const [attachments, setAttachments] = useState<TaskAttachment[]>([]);
+  const [dateValue, setDateValue] = useState(new Date());
 
   const reset = () => {
     setTitle("");
@@ -57,7 +58,7 @@ export default function AddTaskModal() {
       dueTime: dueTime || null,
       priority,
       category: category.trim() || null,
-      projectId,
+      projectId:projectId || null,
       attachments,
     });
 
@@ -66,27 +67,33 @@ export default function AddTaskModal() {
   };
 
   const onDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    // Android requires manual closing; iOS can stay open in a 'spinner'
-    if (Platform.OS === 'android') setShowDatePicker(false);
-
+    setShowDatePicker(false); // Close immediately on selection for better UX
     if (selectedDate) {
-      // Formats to YYYY-MM-DD for database & teammate's web compatibility
+      setDateValue(selectedDate);
       setDueDate(selectedDate.toISOString().split('T')[0]);
     }
   };
 
-  const onTimeChange = (event: DateTimePickerEvent, selectedTime?: Date) => {
-    if (Platform.OS === 'android') setShowTimePicker(false);
+  const [pickerDate, setPickerDate] = useState(() => {
+    const d = new Date();
+    d.setHours(12, 0, 0, 0);
+    return d;
+  });
 
-    if (selectedTime) {
-      const timeString = selectedTime.toLocaleTimeString([], {
+  const onTimeChange = (event: any, selectedDate?: Date) => {
+    setShowTimePicker(false); // Close immediately on selection for better UX
+    // 2. ONLY update the state if the user explicitly 'Set' the time
+    if (event.type === 'set' && selectedDate) {
+      setPickerDate(selectedDate);
+
+      const timeString = selectedDate.toLocaleTimeString([], {
         hour: '2-digit',
-        minute: '2-digit'
+        minute: '2-digit',
       });
       setDueTime(timeString);
     }
+    if (Platform.OS === 'android') setShowTimePicker(false);
   };
-
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -173,7 +180,6 @@ export default function AddTaskModal() {
               />
 
               {/* Due Date Section */}
-              {/* Deadlines Section */}
               <View style={styles.row}>
                 <View style={{ flex: 1, marginRight: 8 }}>
                   <Text style={styles.label}>Due date</Text>
@@ -212,7 +218,7 @@ export default function AddTaskModal() {
 
               {showTimePicker && (
                 <DateTimePicker
-                  value={new Date()}
+                  value={pickerDate}
                   mode="time"
                   is24Hour={false}
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}

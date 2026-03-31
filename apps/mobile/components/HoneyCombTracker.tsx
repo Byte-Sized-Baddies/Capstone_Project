@@ -4,7 +4,7 @@ import Svg, { Path } from "react-native-svg";
 import { useTasks } from "../context/tasks";
 
 // Configuration
-const DAILY_GOAL = 5;
+
 const HEX_SIZE = 22; // Smaller, cleaner size
 
 const Hexagon = ({ filled }: { filled: boolean }) => {
@@ -47,24 +47,21 @@ const Hexagon = ({ filled }: { filled: boolean }) => {
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 export default function HoneyCombTracker() {
-    const { tasks } = useTasks();
+    const { tasks, dailyGoal } = useTasks();
 
     // Count tasks completed TODAY
     const completedToday = tasks.filter((t) => {
+        // 1. Must use the 'done' property mapped in TasksProvider
         if (!t.done) return false;
 
-        if (t.completedAt) {
-            const today = new Date();
-            const doneDate = new Date(t.completedAt);
+        // 2. Get today's date in YYYY-MM-DD format to match Supabase strings
+        const today = new Date().toISOString().slice(0, 10);
 
-            return (
-                doneDate.getDate() === today.getDate() &&
-                doneDate.getMonth() === today.getMonth() &&
-                doneDate.getFullYear() === today.getFullYear()
-            );
-        }
+        // 3. Fallback check: Use createdAt if completedAt isn't populated yet
+        // This ensures the honeycomb fills even before the DB round-trip finishes
+        const taskDate = t.completedAt || t.createdAt;
 
-        return false;
+        return taskDate?.startsWith(today);
     }).length;
 
     return (
@@ -74,13 +71,15 @@ export default function HoneyCombTracker() {
                 <Text style={styles.label}>Daily Nectar</Text>
                 <View style={styles.scoreRow}>
                     <Text style={styles.bigScore}>{completedToday}</Text>
-                    <Text style={styles.goalScore}>/{DAILY_GOAL}</Text>
+                    {/* 3. Use the context-driven dailyGoal instead of hardcoded 5 */}
+                    <Text style={styles.goalScore}>/{dailyGoal}</Text>
                 </View>
             </View>
 
             {/* Right Side: Visuals */}
             <View style={styles.visualSide}>
-                {Array.from({ length: DAILY_GOAL }).map((_, index) => (
+                {/* 4. Generate hexagons dynamically based on Mia's current goal */}
+                {Array.from({ length: dailyGoal }).map((_, index) => (
                     <Hexagon key={index} filled={index < completedToday} />
                 ))}
             </View>

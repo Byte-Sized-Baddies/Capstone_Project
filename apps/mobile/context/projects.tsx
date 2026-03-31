@@ -59,6 +59,17 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
 
     useEffect(() => {
         fetchProjects();
+
+        const subscription = supabase
+            .channel('public:projects')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, () => {
+                fetchProjects(); // Refresh the list whenever a change happens
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(subscription);
+        };
     }, [fetchProjects]);
 
     // 2. Create Project (Supabase)
@@ -69,21 +80,20 @@ export function ProjectsProvider({ children }: { children: ReactNode }) {
             .from('projects')
             .insert([{
                 name: name.trim(),
-                color,
-                icon,
+                color: color || '#D1D5DB', // Use passed color or light gray
+                icon: icon || 'folder',
                 user_id: user.id
             }])
             .select();
 
-        if (error) {
-            console.error("Error creating project:", error.message);
-        } else if (data) {
-            const newProj = {
-                id: data[0].id,
-                name: data[0].name,
-                color: data[0].color,
-                icon: data[0].icon,
-                createdAt: data[0].created_at
+        if (data && data.length > 0) {
+            const p = data[0];
+            const newProj: Project = {
+                id: p.id,
+                name: p.name,
+                color: p.color,
+                icon: p.icon,
+                createdAt: p.created_at
             };
             setProjects((prev) => [...prev, newProj]);
             setActiveProjectId(newProj.id);

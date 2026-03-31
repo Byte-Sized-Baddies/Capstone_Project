@@ -20,7 +20,7 @@ type SortOption = "added" | "priority" | "dueDate";
 
 export default function DashboardScreen() {
   const router = useRouter();
-  const { tasks, updateTask, toggleTask } = useTasks();
+  const { tasks, updateTask, toggleTask, deleteTask } = useTasks();
 
   const [sortOption, setSortOption] = useState<SortOption>("added");
   const [showTodayOnly, setShowTodayOnly] = useState(false);
@@ -113,7 +113,7 @@ export default function DashboardScreen() {
                 style={styles.profileMenuItem}
                 onPress={() => {
                   setProfileMenuOpen(false);
-                  router.push("/profile"); 
+                  router.push("/profile");
                 }}
               >
                 <Text style={styles.profileMenuText}>Profile</Text>
@@ -123,7 +123,7 @@ export default function DashboardScreen() {
                 style={styles.profileMenuItem}
                 onPress={() => {
                   setProfileMenuOpen(false);
-                  router.push("/settings"); 
+                  router.push("/settings");
                 }}
               >
                 <Text style={styles.profileMenuText}>Settings</Text>
@@ -224,6 +224,7 @@ export default function DashboardScreen() {
             updateTask(editingTask.id, updates);
             setEditingTask(null);
           }}
+          onDelete={(taskId) => deleteTask(taskId)}   // ✅ useTasks().deleteTask
         />
       )}
 

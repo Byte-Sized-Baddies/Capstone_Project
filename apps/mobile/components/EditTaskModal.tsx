@@ -1,6 +1,6 @@
 // apps/mobile/components/EditTaskModal.tsx
 import React, { useEffect, useState } from "react";
-import { Platform } from "react-native";
+import { Platform, Alert } from "react-native";
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import {
     Modal,
@@ -38,6 +38,8 @@ type EditTaskModalProps = {
         attachments?: TaskAttachment[];
         projectId?: string | null;
     }) => void;
+    onDelete: (taskId: string) => Promise<void> | void;
+
 };
 
 
@@ -45,6 +47,7 @@ export default function EditTaskModal({
     task,
     onClose,
     onSave,
+    onDelete,
 }: EditTaskModalProps) {
     const { projects } = useProjects() as { projects: ProjectLike[] };
 
@@ -105,6 +108,29 @@ export default function EditTaskModal({
             attachments,
             projectId,
         });
+    };
+
+    const handleDelete = () => {
+        Alert.alert(
+            "Delete task?",
+            "This can’t be undone.",
+            [
+                { text: "Cancel", style: "cancel" },
+                {
+                    text: "Delete",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await onDelete(String(task.id));
+                            onClose();
+                        } catch (e) {
+                            console.error("Delete failed:", e);
+                            Alert.alert("Error", "Could not delete the task. Please try again.");
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleRemoveAttachment = (id: string) => {
@@ -288,6 +314,10 @@ export default function EditTaskModal({
                         <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
                             <Text style={styles.saveButtonText}>Save changes</Text>
                         </TouchableOpacity>
+                        {/* Delete */}
+                        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+                            <Text style={styles.deleteButtonText}>Delete task</Text>
+                        </TouchableOpacity>
                     </ScrollView>
                 </View>
             </View>
@@ -421,5 +451,18 @@ const styles = StyleSheet.create({
     saveButtonText: {
         color: "white",
         fontWeight: "600",
+    },
+    deleteButton: {
+        marginTop: 14,
+        backgroundColor: "#fee2e2",
+        borderRadius: 999,
+        paddingVertical: 12,
+        alignItems: "center",
+        borderWidth: 1,
+        borderColor: "#fecaca",
+    },
+    deleteButtonText: {
+        color: "#b91c1c",
+        fontWeight: "700",
     },
 });

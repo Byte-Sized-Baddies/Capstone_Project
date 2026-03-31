@@ -49,6 +49,10 @@ export default function IntegrationsPage() {
   const [gcalSyncing, setGcalSyncing] = useState(false);
   const [gcalSyncResult, setGcalSyncResult] = useState<string | null>(null);
 
+  // Outlook state
+  const [outlookSyncing, setOutlookSyncing] = useState(false);
+  const [outlookSyncResult, setOutlookSyncResult] = useState<string | null>(null);
+
   // Gmail state
   const [gmailEmails, setGmailEmails] = useState<GmailEmail[]>([]);
   const [gmailLoading, setGmailLoading] = useState(false);
@@ -207,7 +211,7 @@ export default function IntegrationsPage() {
 
   // ── OUTLOOK CALENDAR ────────────────────────────────────────────────────────
   const connectOutlookCalendar = () => {
-    window.location.href = `/api/auth/outlook?userId=${userId}`;
+    window.location.href = `/api/auth/microsoft?userId=${userId}`;
   };
 
   const disconnectOutlookCalendar = async () => {
@@ -217,16 +221,39 @@ export default function IntegrationsPage() {
       .from("integrations_v2")
       .delete()
       .eq("user_id", userId)
-      .eq("service", "outlook_calendar");
+      .eq("service", "microsoft_outlook");
 
     setIntegrations((prev) => {
       const n = { ...prev };
-      delete n.outlook_calendar;
+      delete n.microsoft_outlook;
       return n;
     });
 
     setStatusMsg("✅ Outlook Calendar disconnected");
     setTimeout(() => setStatusMsg(null), 3000);
+  };
+
+  const syncOutlookCalendar = async () => {
+    setOutlookSyncing(true);
+    setOutlookSyncResult(null);
+    try {
+      const res = await fetch("/api/integrations/outlook/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setOutlookSyncResult(
+          `✅ Synced ${data.synced} task${data.synced !== 1 ? "s" : ""} to Outlook`
+        );
+      } else {
+        setOutlookSyncResult(`❌ Sync failed: ${data.error}`);
+      }
+    } catch {
+      setOutlookSyncResult("❌ Sync failed — check your connection");
+    }
+    setOutlookSyncing(false);
   };
 
   // ── GMAIL ───────────────────────────────────────────────────────────────────
@@ -285,7 +312,7 @@ export default function IntegrationsPage() {
   };
 
   const gcal = integrations.google_calendar;
-  const outlook = integrations.outlook_calendar;
+  const outlook = integrations.microsoft_outlook;
   const gmail = integrations.gmail;
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
 
@@ -607,7 +634,6 @@ export default function IntegrationsPage() {
                 </div>
               </div>
             </div>
-
             <span
               className="text-xs px-3 py-1 rounded-full font-semibold"
               style={{
@@ -621,27 +647,31 @@ export default function IntegrationsPage() {
 
           {outlook ? (
             <div className="space-y-3">
-              <div
-                className="text-xs px-3 py-2 rounded-lg"
-                style={{ background: t.surfaceHover, color: t.textDim }}
-              >
-                Calendar: {outlook.config?.calendar_name || "Primary Outlook calendar"}
-              </div>
+              {outlookSyncResult && (
+                <div
+                  className="text-xs px-3 py-2 rounded-lg"
+                  style={{
+                    background: t.surfaceHover,
+                    color: outlookSyncResult.startsWith("✅") ? t.success : t.danger,
+                  }}
+                >
+                  {outlookSyncResult}
+                </div>
+              )}
 
               <div className="flex gap-2">
                 <button
-                  disabled
+                  onClick={syncOutlookCalendar}
+                  disabled={outlookSyncing}
                   className="flex-1 py-2.5 rounded-xl text-sm font-bold"
                   style={{
                     background: t.accent,
                     color: t.accentText,
-                    opacity: 0.65,
-                    cursor: "not-allowed",
+                    opacity: outlookSyncing ? 0.6 : 1,
                   }}
                 >
-                  Sync coming soon
+                  {outlookSyncing ? "Syncing…" : "↻ Sync now"}
                 </button>
-
                 <button
                   onClick={disconnectOutlookCalendar}
                   className="px-4 py-2.5 rounded-xl text-sm font-medium"

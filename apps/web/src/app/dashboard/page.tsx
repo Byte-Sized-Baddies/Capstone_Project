@@ -122,7 +122,9 @@ function DashboardContent() {
       const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
       setDisplayName(name);
     };
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => checkSession());
+    const { data: authListener } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) checkSession(); else { router.push("/login"); }
+    });
     checkSession();
     return () => { authListener.subscription.unsubscribe(); };
   }, [router]);

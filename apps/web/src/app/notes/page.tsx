@@ -83,7 +83,9 @@ function NotesContent() {
         setAuthReady(true);
       }
     };
-    const { data: l } = supabase.auth.onAuthStateChange(() => check());
+    const { data: l } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) check(); else { setAuthReady(true); router.push("/login"); }
+    });
     check();
     return () => l.subscription.unsubscribe();
   }, [router]);

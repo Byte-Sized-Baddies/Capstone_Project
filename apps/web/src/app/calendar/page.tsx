@@ -71,7 +71,9 @@ export default function CalendarPage() {
         setAuthReady(true);
       }
     };
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => checkSession());
+    const { data: authListener } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) checkSession(); else { setAuthReady(true); router.push("/login"); }
+    });
     checkSession();
     return () => { authListener.subscription.unsubscribe(); };
   }, [router]);

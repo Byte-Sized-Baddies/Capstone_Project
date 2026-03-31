@@ -106,7 +106,9 @@ export default function TimeBlockingPage() {
         setAuthReady(true);
       }
     };
-    const { data: l } = supabase.auth.onAuthStateChange(() => checkSession());
+    const { data: l } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (session) checkSession(); else { setAuthReady(true); router.push("/login"); }
+    });
     checkSession();
     return () => { l.subscription.unsubscribe(); };
   }, [router]);

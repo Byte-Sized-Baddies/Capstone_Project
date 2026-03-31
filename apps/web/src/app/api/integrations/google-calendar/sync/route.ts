@@ -24,22 +24,18 @@ async function refreshToken(config: any) {
 }
 
 export async function POST(req: NextRequest) {
+  const { userId } = await req.json();
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  const cookieHeader = req.headers.get("cookie") || "";
-
-  const supabase = createClient(supabaseUrl, supabaseKey, {
-    global: { headers: { cookie: cookieHeader } },
-  });
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const supabase = createClient(supabaseUrl, supabaseKey);
 
   // Load Google Calendar integration
   const { data: integration } = await supabase
     .from("integrations_v2")
     .select("*")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("service", "google_calendar")
     .single();
 
@@ -51,7 +47,7 @@ export async function POST(req: NextRequest) {
   if (Date.now() > config.expires_at - 60000) {
     try {
       config = await refreshToken(config);
-      await supabase.from("integrations_v2").update({ config }).eq("user_id", user.id).eq("service", "google_calendar");
+      await supabase.from("integrations_v2").update({ config }).eq("user_id", userId).eq("service", "google_calendar");
     } catch {
       return NextResponse.json({ error: "Token refresh failed — please reconnect Google Calendar" }, { status: 401 });
     }
@@ -61,7 +57,7 @@ export async function POST(req: NextRequest) {
   const { data: tasks } = await supabase
     .from("tasks_v2")
     .select("id, title, description, due_date, is_completed")
-    .eq("user_id", user.id)
+    .eq("user_id", userId)
     .eq("is_archived", false)
     .not("due_date", "is", null);
 
@@ -81,16 +77,14 @@ export async function POST(req: NextRequest) {
       extendedProperties: { private: { dobee_task_id: String(task.id) } },
     };
 
-    // Check if event already exists
     const searchRes = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?privateExtendedProperty=doobe_task_id%3D${task.id}`,
+      `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events?privateExtendedProperty=dobee_task_id%3D${task.id}`,
       { headers: { Authorization: `Bearer ${config.access_token}` } }
     );
     const searchData = await searchRes.json();
     const existing = searchData.items?.[0];
 
     if (existing) {
-      // Update existing event
       await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events/${existing.id}`,
         {
@@ -100,7 +94,6 @@ export async function POST(req: NextRequest) {
         }
       );
     } else {
-      // Create new event
       const createRes = await fetch(
         `https://www.googleapis.com/calendar/v3/calendars/${calendarId}/events`,
         {

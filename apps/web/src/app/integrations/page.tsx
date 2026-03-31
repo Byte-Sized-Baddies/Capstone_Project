@@ -153,7 +153,11 @@ export default function IntegrationsPage() {
   const syncGoogleCalendar = async () => {
     setGcalSyncing(true); setGcalSyncResult(null);
     try {
-      const res = await fetch("/api/integrations/google-calendar/sync", { method: "POST" });
+      const res = await fetch("/api/integrations/google-calendar/sync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
       const data = await res.json();
       if (res.ok) setGcalSyncResult(`✅ Synced ${data.synced} task${data.synced !== 1 ? "s" : ""} to Google Calendar`);
       else setGcalSyncResult(`❌ Sync failed: ${data.error || "Unknown error"}`);

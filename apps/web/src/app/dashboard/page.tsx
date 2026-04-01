@@ -55,6 +55,61 @@ const NAV_ITEMS = [
   { href: "/settings", label: "Settings", icon: "⚙️", active: false },
 ];
 
+const ConfettiCanvas = ({ big, onDone }: { big: boolean; onDone: () => void }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    const count = big ? 220 : 80;
+    const colors = ["#FFC107", "#22c55e", "#3b82f6", "#f472b6", "#a78bfa", "#fb923c", "#ffffff"];
+    interface Particle { x: number; y: number; w: number; h: number; color: string; vx: number; vy: number; angle: number; spin: number; }
+    const particles: Particle[] = Array.from({ length: count }, () => ({
+      x: Math.random() * canvas.width,
+      y: -10 - Math.random() * 200,
+      w: 6 + Math.random() * 8,
+      h: 4 + Math.random() * 6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      vx: (Math.random() - 0.5) * 5,
+      vy: 2 + Math.random() * 5,
+      angle: Math.random() * Math.PI * 2,
+      spin: (Math.random() - 0.5) * 0.25,
+    }));
+    const duration = big ? 200 : 100;
+    let tick = 0;
+    let frame: number;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      tick++;
+      const alpha = Math.max(0, 1 - tick / duration);
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.12;
+        p.angle += p.spin;
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+        ctx.restore();
+      });
+      if (tick < duration) {
+        frame = requestAnimationFrame(animate);
+      } else {
+        onDone();
+      }
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [big, onDone]);
+  return <canvas ref={canvasRef} style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999 }} />;
+};
+
 function DashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -101,6 +156,7 @@ function DashboardContent() {
   const [dateFilter, setDateFilter] = useState("");
   const [sortBy, setSortBy] = useState("added");
   const [dailyGoal] = useState(5);
+  const [confettiTrigger, setConfettiTrigger] = useState<{ key: number; big: boolean } | null>(null);
 
   const searchRef = useRef<HTMLInputElement | null>(null);
   const notifiedRef = useRef(false);
@@ -340,7 +396,14 @@ function DashboardContent() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
     if (!user) return;
-    await supabase.from("tasks_v2").delete().eq("id", id).eq("user_id", user.id);
+    // Check ownership before attempting delete
+    const { data: row } = await supabase.from("tasks_v2").select("user_id").eq("id", id).single();
+    if (row && row.user_id !== user.id) {
+      alert("You can only delete tasks you created. This task belongs to another user in a shared folder.");
+      return;
+    }
+    const { error } = await supabase.from("tasks_v2").delete().eq("id", id).eq("user_id", user.id);
+    if (error) { alert(error.message); return; }
     setTasks(prev => prev.filter(tk => tk.id !== id));
   };
 
@@ -379,6 +442,11 @@ function DashboardContent() {
     const user = userData.user;
     if (!user) return;
     const nextDone = !task.done;
+    if (nextDone) {
+      const newCount = completedCount + 1;
+      const big = completedCount < dailyGoal && newCount >= dailyGoal;
+      setConfettiTrigger(prev => ({ key: (prev?.key ?? 0) + 1, big }));
+    }
     await supabase.from("tasks_v2").update({ is_completed: nextDone }).eq("id", id).eq("user_id", user.id);
     if (nextDone && task.isRecurring && task.recurringFrequency) {
       const nextDue = getNextDueDate(task.due, task.recurringFrequency, task.recurringDays ?? []);
@@ -886,6 +954,9 @@ function DashboardContent() {
             </div>
           </div>
         </div>
+      )}
+      {confettiTrigger && (
+        <ConfettiCanvas key={confettiTrigger.key} big={confettiTrigger.big} onDone={() => setConfettiTrigger(null)} />
       )}
     </main>
   );

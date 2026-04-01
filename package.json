@@ -2,7 +2,7 @@
   "name": "do-bee",
   "main": "expo-router/entry",
   "private": true,
-  "packageManager": "pnpm@10.6.5",
+  "packageManager": "pnpm@9.15.4",
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
@@ -26,5 +26,8 @@
     "react": "19.1.0",
     "react-native": "0.81.5"
   },
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "engines": {
+    "node": "20.x"
+  }
 }

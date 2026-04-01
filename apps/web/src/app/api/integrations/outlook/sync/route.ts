@@ -24,11 +24,11 @@ export async function POST(req: NextRequest) {
 
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
   const { data: integration } = await supabase
-    .from("integrations_v2").select("*").eq("user_id", userId).eq("service", "microsoft_outlook").single();
+    .from("integrations_v2").select("*").eq("user_id", userId).eq("service", "outlook_calendar").single();
 
   if (!integration) return NextResponse.json({ error: "Outlook not connected" }, { status: 400 });
 
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   if (Date.now() > config.expires_at - 60000) {
     try {
       config = await refreshOutlookToken(config);
-      await supabase.from("integrations_v2").update({ config }).eq("user_id", userId).eq("service", "microsoft_outlook");
+      await supabase.from("integrations_v2").update({ config }).eq("user_id", userId).eq("service", "outlook_calendar");
     } catch {
       return NextResponse.json({ error: "Token refresh failed — please reconnect Outlook" }, { status: 401 });
     }

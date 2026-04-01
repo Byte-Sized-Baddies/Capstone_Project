@@ -211,7 +211,7 @@ export default function IntegrationsPage() {
 
   // ── OUTLOOK CALENDAR ────────────────────────────────────────────────────────
   const connectOutlookCalendar = () => {
-  window.location.href = `/api/auth/outlook?userId=${userId}`;
+  window.location.href = `/api/auth/microsoft?userId=${userId}`;
   };
 
   const disconnectOutlookCalendar = async () => {
@@ -221,11 +221,11 @@ export default function IntegrationsPage() {
       .from("integrations_v2")
       .delete()
       .eq("user_id", userId)
-      .eq("service", "outlook_calendar");
+      .eq("service", "microsoft_outlook");
 
     setIntegrations((prev) => {
       const n = { ...prev };
-      delete n.outlook_calendar;
+      delete n.microsoft_outlook;
       return n;
     });
 

@@ -1,23 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
-  const clientId = process.env.MICROSOFT_CLIENT_ID;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : "http://localhost:3000");
 
-  if (!clientId) {
-    return NextResponse.redirect(new URL("/integrations?error=missing_microsoft_client_id", appUrl));
-  }
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get("userId");
 
-  const userId = new URL(req.url).searchParams.get("userId") || "";
-  const redirectUri = `${appUrl}/api/auth/microsoft/callback`;
-
-  const url = new URL("https://login.microsoftonline.com/common/oauth2/v2.0/authorize");
-  url.searchParams.set("client_id", clientId);
-  url.searchParams.set("redirect_uri", redirectUri);
-  url.searchParams.set("response_type", "code");
-  url.searchParams.set("scope", "https://graph.microsoft.com/Calendars.ReadWrite offline_access");
-  url.searchParams.set("response_mode", "query");
-  url.searchParams.set("state", userId);
-
-  return NextResponse.redirect(url.toString());
+  return NextResponse.json({
+    route_hit: "/api/auth/microsoft",
+    userId,
+    hasClientId: !!process.env.MICROSOFT_CLIENT_ID,
+    hasClientSecret: !!process.env.MICROSOFT_CLIENT_SECRET,
+    tenantId: process.env.MICROSOFT_TENANT_ID || null,
+    appUrl,
+    vercelUrl: process.env.VERCEL_URL || null,
+  });
 }

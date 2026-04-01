@@ -33,7 +33,6 @@ export default function LoginPage() {
   useEffect(() => {
     const getSession = async () => {
       await supabase.auth.refreshSession();
-      await supabase.auth.signOut();
       const { data: { session } } = await getSessionSafe();
       if (session) router.replace("/dashboard");
     };

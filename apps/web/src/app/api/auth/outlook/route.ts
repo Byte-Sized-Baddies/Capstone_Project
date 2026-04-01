@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+
+     console.log("MICROSOFT_CLIENT_ID exists:", !!process.env.MICROSOFT_CLIENT_ID);
+     console.log("MICROSOFT_TENANT_ID exists:", !!process.env.MICROSOFT_TENANT_ID);
+     console.log("VERCEL_URL:", process.env.VERCEL_URL);
+     console.log("NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
+
+
   const appUrl =
     process.env.NEXT_PUBLIC_APP_URL ||
     (process.env.VERCEL_URL

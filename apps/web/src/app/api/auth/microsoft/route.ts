@@ -10,13 +10,33 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const userId = searchParams.get("userId");
 
-  return NextResponse.json({
-    route_hit: "/api/auth/microsoft",
-    userId,
-    hasClientId: !!process.env.MICROSOFT_CLIENT_ID,
-    hasClientSecret: !!process.env.MICROSOFT_CLIENT_SECRET,
-    tenantId: process.env.MICROSOFT_TENANT_ID || null,
-    appUrl,
-    vercelUrl: process.env.VERCEL_URL || null,
-  });
+  if (!userId) {
+    return NextResponse.redirect(`${appUrl}/integrations?error=missing_user`);
+  }
+
+  const clientId = process.env.MICROSOFT_CLIENT_ID;
+  const tenantId = process.env.MICROSOFT_TENANT_ID || "common";
+  const redirectUri = `${appUrl}/api/auth/microsoft/callback`;
+
+  if (!clientId) {
+    return NextResponse.redirect(
+      `${appUrl}/integrations?error=missing_microsoft_client_id`
+    );
+  }
+
+  const authUrl = new URL(
+    `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize`
+  );
+
+  authUrl.searchParams.set("client_id", clientId);
+  authUrl.searchParams.set("response_type", "code");
+  authUrl.searchParams.set("redirect_uri", redirectUri);
+  authUrl.searchParams.set("response_mode", "query");
+  authUrl.searchParams.set(
+    "scope",
+    "offline_access openid profile email User.Read Calendars.ReadWrite"
+  );
+  authUrl.searchParams.set("state", userId);
+
+  return NextResponse.redirect(authUrl.toString());
 }

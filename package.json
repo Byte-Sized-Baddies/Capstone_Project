@@ -2,7 +2,8 @@
   "name": "do-bee",
   "main": "expo-router/entry",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "pnpm@8.15.6"
+}
   "scripts": {
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",

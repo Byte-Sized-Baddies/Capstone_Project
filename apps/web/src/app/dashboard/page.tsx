@@ -468,7 +468,7 @@ function DashboardContent() {
   }
   return tk;
 }));
-
+};
   const setTaskStatus = async (id: number, status: Status) => {
   const { error } = await supabase
     .from("tasks_v2")
@@ -815,17 +815,17 @@ function DashboardContent() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
-  {!task.done && (
-    <select
-      value={task.status}
-      onChange={e => setTaskStatus(task.id, e.target.value as Status)}
-      className="text-sm px-3 py-2 rounded-xl outline-none"
-      style={inputStyle}
-    >
-      <option value="not_started">Not Started</option>
-      <option value="in_progress">In Progress</option>
-    </select>
-  )}
+                                {!task.done && (
+                                  <select
+                                    value={task.status}
+                                    onChange={e => setTaskStatus(task.id, e.target.value as Status)}
+                                    className="text-sm px-3 py-2 rounded-xl outline-none"
+                                    style={inputStyle}
+                                  >
+                                    <option value="not_started">Not Started</option>
+                                    <option value="in_progress">In Progress</option>
+                                  </select>
+                                )}
 
   {/* Edit */}
   <div className="relative group">

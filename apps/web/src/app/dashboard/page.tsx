@@ -460,19 +460,30 @@ function DashboardContent() {
         setTasks(prev => [{ ...task, id: newTask.id, due: nextDue, done: false, status: "not_started", created: new Date(newTask.created_at).getTime() }, ...prev]);
       }
     }
-    setTasks(prev => prev.map(tk => {
-      if (tk.id === id) {
-        const updated = { ...tk, done: nextDone, status: nextDone ? "not_started" as Status : tk.status };
-        if (!tk.done && updated.done) sendNotification("Task Completed", tk.text);
-        return updated;
-      }
-      return tk;
-    }));
-  };
+   setTasks(prev => prev.map(tk => {
+  if (tk.id === id) {
+    const updated = { ...tk, done: nextDone };
+    if (!tk.done && updated.done) sendNotification("Task Completed", tk.text);
+    return updated;
+  }
+  return tk;
+}));
 
-  const setTaskStatus = (id: number, status: Status) => {
-    setTasks(prev => prev.map(tk => tk.id === id ? { ...tk, status } : tk));
-  };
+  const setTaskStatus = async (id: number, status: Status) => {
+  const { error } = await supabase
+    .from("tasks_v2")
+    .update({ status })
+    .eq("id", id);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setTasks(prev =>
+    prev.map(tk => (tk.id === id ? { ...tk, status } : tk))
+  );
+};
 
   const addCustomCategory = async (val: string) => {
     const v = val.trim();

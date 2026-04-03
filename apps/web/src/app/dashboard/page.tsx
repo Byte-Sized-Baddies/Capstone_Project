@@ -804,6 +804,18 @@ function DashboardContent() {
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 flex-shrink-0">
+  {!task.done && (
+    <select
+      value={task.status}
+      onChange={e => setTaskStatus(task.id, e.target.value as Status)}
+      className="text-sm px-3 py-2 rounded-xl outline-none"
+      style={inputStyle}
+    >
+      <option value="not_started">Not Started</option>
+      <option value="in_progress">In Progress</option>
+    </select>
+  )}
+
   {/* Edit */}
   <div className="relative group">
     <button
@@ -813,8 +825,10 @@ function DashboardContent() {
     >
       ✎
     </button>
-    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-      style={{ background: t.text, color: t.bg }}>
+    <div
+      className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
+      style={{ background: t.text, color: t.bg }}
+    >
       Edit
     </div>
   </div>
@@ -825,11 +839,14 @@ function DashboardContent() {
       onClick={() => archiveTask(task.id)}
       className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
       style={{ background: t.surfaceHover, color: t.textMuted }}
+      title="Archive"
     >
       📦
     </button>
-    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-      style={{ background: t.text, color: t.bg }}>
+    <div
+      className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
+      style={{ background: t.text, color: t.bg }}
+    >
       Archive
     </div>
   </div>
@@ -843,8 +860,10 @@ function DashboardContent() {
     >
       🗑
     </button>
-    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition-opacity"
-      style={{ background: t.text, color: t.bg }}>
+    <div
+      className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
+      style={{ background: t.text, color: t.bg }}
+    >
       Delete
     </div>
   </div>

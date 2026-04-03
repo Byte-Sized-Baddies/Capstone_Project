@@ -1,0 +1,3 @@
+pnpm install
+git add pnpm-lock.yaml package.json
+git commit -m "Pin pnpm via packageManager"

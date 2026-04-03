@@ -576,7 +576,7 @@ function DashboardContent() {
 
   /* 🔥 GLOBAL FONT SCALE */
   html {
-    font-size: 18px; /* 👈 change this number to control overall size */
+    font-size: 19px; /* 👈 change this number to control overall size */
   }
 
   * {

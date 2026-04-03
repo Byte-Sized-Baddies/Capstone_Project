@@ -803,17 +803,52 @@ function DashboardContent() {
                                     )}
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-1 flex-shrink-0">
-                                  {!task.done && (
-                                    <select value={task.status} onChange={e => setTaskStatus(task.id, e.target.value as Status)} className="text-xs px-2 py-1.5 rounded-lg outline-none" style={inputStyle}>
-                                      <option value="not_started">Not Started</option>
-                                      <option value="in_progress">In Progress</option>
-                                    </select>
-                                  )}
-                                  <button onClick={() => handleEdit(task)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer" style={{ background: t.surfaceHover, color: t.textMuted }}>✎</button>
-                                  <button onClick={() => archiveTask(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer" style={{ background: t.surfaceHover, color: t.textMuted }} title="Archive">📦</button>
-                                  <button onClick={() => deleteTask(task.id)} className="w-8 h-8 rounded-lg flex items-center justify-center text-xs cursor-pointer" style={{ background: t.surfaceHover, color: t.danger }}>🗑</button>
-                                </div>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+  {/* Edit */}
+  <div className="relative group">
+    <button
+      onClick={() => handleEdit(task)}
+      className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
+      style={{ background: t.surfaceHover, color: t.textMuted }}
+    >
+      ✎
+    </button>
+    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ background: t.text, color: t.bg }}>
+      Edit
+    </div>
+  </div>
+
+  {/* Archive */}
+  <div className="relative group">
+    <button
+      onClick={() => archiveTask(task.id)}
+      className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
+      style={{ background: t.surfaceHover, color: t.textMuted }}
+    >
+      📦
+    </button>
+    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ background: t.text, color: t.bg }}>
+      Archive
+    </div>
+  </div>
+
+  {/* Delete */}
+  <div className="relative group">
+    <button
+      onClick={() => deleteTask(task.id)}
+      className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
+      style={{ background: t.surfaceHover, color: t.danger }}
+    >
+      🗑
+    </button>
+    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 transition-opacity"
+      style={{ background: t.text, color: t.bg }}>
+      Delete
+    </div>
+  </div>
+</div>
                               </div>
                             </div>
                           </div>

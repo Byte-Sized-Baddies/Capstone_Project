@@ -370,7 +370,7 @@ function DashboardContent() {
       recurring_days: isRecurring ? recurringDays : [],
     };
     if (editId !== null) {
-      const { error } = await supabase.from("tasks_v2").update(payload).eq("id", editId).eq("user_id", user.id);
+      const { error } = await supabase.from("tasks_v2").update(payload).eq("id", editId);
       if (error) { alert(error.message); return; }
       setTasks(prev => prev.map(tk => tk.id === editId ? { ...tk, text: payload.title, description: payload.description ?? "", due: payload.due_date ?? "No date", priority: intToPriority(payload.priority), category: newCategory, categoryId: payload.category_id, folderId: payload.folder_id ?? null, status: payload.status as Status } : tk));
     } else {
@@ -411,7 +411,7 @@ function DashboardContent() {
     const { data: userData } = await supabase.auth.getUser();
     const user = userData.user;
     if (!user) return;
-    await supabase.from("tasks_v2").update({ is_archived: true }).eq("id", id).eq("user_id", user.id);
+    await supabase.from("tasks_v2").update({ is_archived: true }).eq("id", id);
     setTasks(prev => prev.filter(tk => tk.id !== id));
   };
 
@@ -447,7 +447,7 @@ function DashboardContent() {
       const big = completedCount < dailyGoal && newCount >= dailyGoal;
       setConfettiTrigger(prev => ({ key: (prev?.key ?? 0) + 1, big }));
     }
-    await supabase.from("tasks_v2").update({ is_completed: nextDone }).eq("id", id).eq("user_id", user.id);
+    await supabase.from("tasks_v2").update({ is_completed: nextDone }).eq("id", id);
     if (nextDone && task.isRecurring && task.recurringFrequency) {
       const nextDue = getNextDueDate(task.due, task.recurringFrequency, task.recurringDays ?? []);
       const { data: newTask } = await supabase.from("tasks_v2").insert({

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { signUpWithEmail, signInWithOAuth } from "../auth/auth";
+import { signUpWithEmail, signInWithEmail, signInWithOAuth } from "../auth/auth";
 import AlertDialog from "../components/AlertDialog";
 import { FcGoogle } from "react-icons/fc";
 import { FaApple, FaMicrosoft } from "react-icons/fa";
@@ -31,19 +31,44 @@ export default function SignUpPage() {
   };
 
   const handleEmailSignUp = async () => {
-    setErr(null);
-    if (!email || !password) return setErr("Email and password required");
-    if (password !== confirmPassword) return setErr("Passwords do not match");
-    if (password.length < 6) return setErr("Password must be at least 6 characters");
-    try {
-      setLoading(true);
-      const { error } = await signUpWithEmail(email, password);
-      if (error) return setErr(error.message);
-      setShowSuccessDialog(true);
-    } finally {
-      setLoading(false);
+  setErr(null);
+
+  if (!email || !password) {
+    return setErr("Email and password required");
+  }
+
+  if (password !== confirmPassword) {
+    return setErr("Passwords do not match");
+  }
+
+  if (password.length < 6) {
+    return setErr("Password must be at least 6 characters");
+  }
+
+  try {
+    setLoading(true);
+
+    // Step 1: Try signing in first
+    const { data: signInData, error: signInError } = await signInWithEmail(email, password);
+
+    if (!signInError && signInData?.user) {
+      setErr("It looks like you already have a Do-Bee account. Please sign in instead.");
+      return;
     }
-  };
+
+    // Step 2: If sign-in did not work, continue with signup
+    const { error: signUpError } = await signUpWithEmail(email, password);
+
+    if (signUpError) {
+      setErr(signUpError.message);
+      return;
+    }
+
+    setShowSuccessDialog(true);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSuccessConfirm = () => {
     setShowSuccessDialog(false);
@@ -172,7 +197,7 @@ export default function SignUpPage() {
       <AlertDialog
         open={showSuccessDialog}
         title="Check your email"
-        message="We sent a confirmation link to your email address."
+        message="If this is a new account, we have sent a confirmation link to your email address."
         confirmText="OK"
         onConfirm={handleSuccessConfirm}
         isDark={isDark}

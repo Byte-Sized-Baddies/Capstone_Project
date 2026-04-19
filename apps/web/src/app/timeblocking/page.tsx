@@ -89,6 +89,8 @@ export default function TimeBlockingPage() {
   const blocksRef = useRef<TimeBlock[]>([]);
   const isTouchDraggingRef = useRef(false);
 
+  const [hideCompleted, setHideCompleted] = useState(true);
+
   const [pendingTask, setPendingTask] = useState<Task | null>(null);
   const [pendingHour, setPendingHour] = useState(0);
   const [pendingMin, setPendingMin] = useState(0);
@@ -389,7 +391,8 @@ export default function TimeBlockingPage() {
   const currentMinTotal = now.getHours() * 60 + now.getMinutes();
   const isToday = selectedDate === today;
 
-  const unscheduledTasks = tasks.filter(task => !blocks.some(b => b.taskId === task.id));
+  const visibleTasks = hideCompleted ? tasks.filter(t => !t.done) : tasks;
+  const unscheduledTasks = visibleTasks.filter(task => !blocks.some(b => b.taskId === task.id));
   const scheduledTaskIds = new Set(blocks.map(b => b.taskId));
 
   const inlineStyles = `
@@ -428,7 +431,14 @@ export default function TimeBlockingPage() {
   const taskPanelContent = (
     <>
       <div className="p-4" style={{ borderBottom: `1px solid ${t.border}` }}>
-        <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Your Tasks</div>
+        <div className="flex items-center justify-between mb-1">
+          <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Your Tasks</div>
+          <button onClick={() => setHideCompleted(p => !p)}
+            className="text-xs px-2 py-1 rounded-lg font-medium transition-colors"
+            style={{ background: hideCompleted ? t.accent + "20" : t.surfaceHover, color: hideCompleted ? t.accent : t.textDim }}>
+            {hideCompleted ? "Hide Done" : "Show All"}
+          </button>
+        </div>
         <div className="text-xs" style={{ color: t.textDim }}>
           <span className="hidden md:inline">Drag tasks onto the schedule →</span>
           <span className="md:hidden">Tap & hold, then drag to schedule tab</span>
@@ -467,10 +477,10 @@ export default function TimeBlockingPage() {
                 })}
               </div>
             )}
-            {tasks.filter(tk => scheduledTaskIds.has(tk.id)).length > 0 && (
+            {visibleTasks.filter(tk => scheduledTaskIds.has(tk.id)).length > 0 && (
               <div>
-                <div className="text-xs font-semibold px-1 mb-2 mt-4" style={{ color: t.textDim }}>SCHEDULED ({tasks.filter(tk => scheduledTaskIds.has(tk.id)).length})</div>
-                {tasks.filter(tk => scheduledTaskIds.has(tk.id)).map(task => {
+                <div className="text-xs font-semibold px-1 mb-2 mt-4" style={{ color: t.textDim }}>SCHEDULED ({visibleTasks.filter(tk => scheduledTaskIds.has(tk.id)).length})</div>
+                {visibleTasks.filter(tk => scheduledTaskIds.has(tk.id)).map(task => {
                   const pc = priorityColor(task.priority, isDark);
                   return (
                     <div key={task.id} className="task-chip p-3 rounded-xl mb-2 opacity-60"
@@ -593,7 +603,11 @@ export default function TimeBlockingPage() {
                 style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.textMuted }}>→</button>
               <div className="min-w-0">
                 <div className="text-sm md:text-base font-bold truncate" style={{ color: t.text }}>{dateLabel}</div>
-                {blocks.length > 0 && <div className="text-xs" style={{ color: t.textDim }}>{blocks.length} block{blocks.length !== 1 ? "s" : ""} scheduled</div>}
+                <div className="text-xs" style={{ color: t.textDim }}>
+                  {blocks.length > 0
+                    ? `${blocks.length} block${blocks.length !== 1 ? "s" : ""} · ${formatDuration(blocks.reduce((sum, b) => sum + b.durationMins, 0))} total`
+                    : "No blocks yet — drag a task to schedule it"}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

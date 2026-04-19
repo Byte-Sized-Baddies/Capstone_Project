@@ -97,7 +97,8 @@ export default function CalendarPage() {
       const { data, error } = await supabase
         .from("tasks_v2")
         .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id")
-        .eq("user_id", user.id);
+        .eq("user_id", user.id)
+        .eq("is_archived", false);
       if (error) return;
       setTasks((data ?? []).map(row => ({
         id: row.id, text: row.title, description: row.description ?? "",

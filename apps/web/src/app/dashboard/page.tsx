@@ -155,6 +155,12 @@ function DashboardContent() {
   const [priorityFilter, setPriorityFilter] = useState<"All" | Priority>("All");
   const [dateFilter, setDateFilter] = useState("");
   const [sortBy, setSortBy] = useState("added");
+
+  // Persist sort preference per folder
+  const handleSortChange = (value: string) => {
+    setSortBy(value);
+    localStorage.setItem(`sortBy_${selectedFolder ?? "all"}`, value);
+  };
   const [dailyGoal] = useState(5);
   const [confettiTrigger, setConfettiTrigger] = useState<{ key: number; big: boolean } | null>(null);
 
@@ -258,7 +264,21 @@ function DashboardContent() {
           .order("created_at", { ascending: false });
         sharedTasks = shared ?? [];
       }
-      const allRows = [...(ownTasks ?? []), ...sharedTasks];
+      // Also load tasks added by collaborators to folders I own
+      const { data: ownedFolderRows } = await supabase.from("folders").select("id").eq("user_id", user.id);
+      const ownedFolderIds = (ownedFolderRows ?? []).map((r: any) => r.id);
+      let collaboratorTasks: any[] = [];
+      if (ownedFolderIds.length > 0) {
+        const { data: colTasks } = await supabase
+          .from("tasks_v2")
+          .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id, is_recurring, recurring_frequency, recurring_days")
+          .in("folder_id", ownedFolderIds)
+          .neq("user_id", user.id)
+          .eq("is_archived", false)
+          .order("created_at", { ascending: false });
+        collaboratorTasks = colTasks ?? [];
+      }
+      const allRows = [...(ownTasks ?? []), ...sharedTasks, ...collaboratorTasks];
       const seen = new Set<number>();
       const unique = allRows.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
       setTasks(unique.map(row => ({
@@ -322,6 +342,12 @@ function DashboardContent() {
   useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
 
+  // Restore sort preference when folder changes
+  useEffect(() => {
+    const saved = localStorage.getItem(`sortBy_${selectedFolder ?? "all"}`);
+    setSortBy(saved ?? "added");
+  }, [selectedFolder]);
+
   const createFolder = async () => {
     const name = newFolderName.trim();
     if (!name) return alert("Please enter a folder name");
@@ -332,6 +358,19 @@ function DashboardContent() {
     if (error || !data) { alert(`Failed to create folder: ${error?.message}`); return; }
     setFolders(prev => [{ id: data.id, name: data.name, color: data.color, owner: user.id, collaborators: [], created: new Date(data.created_at).getTime() }, ...prev]);
     setNewFolderName(""); setShowCreateFolderModal(false);
+  };
+
+  const deleteFolder = async (folderId: number, folderName: string) => {
+    if (!confirm(`Delete "${folderName}"? Tasks will be unassigned from this folder.`)) return;
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData.user;
+    if (!user) return;
+    await supabase.from("tasks_v2").update({ folder_id: null }).eq("folder_id", folderId).eq("user_id", user.id);
+    await supabase.from("folder_members").delete().eq("folder_id", folderId);
+    const { error } = await supabase.from("folders").delete().eq("id", folderId).eq("user_id", user.id);
+    if (error) { alert(`Failed to delete folder: ${error.message}`); return; }
+    setFolders(prev => prev.filter(f => f.id !== folderId));
+    if (selectedFolder === folderId) setSelectedFolder(null);
   };
 
 
@@ -678,24 +717,34 @@ function DashboardContent() {
               </a>
             ))}
           </nav>
-          {folders.length > 0 && (
-            <div className="mt-6">
-              <p className="text-xs font-semibold uppercase tracking-wider mb-2 px-1" style={{ color: t.textDim }}>Folders</p>
-              <div className="space-y-1">
-                <button onClick={() => setSelectedFolder(null)} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
-                  style={{ background: selectedFolder === null ? t.accent : "transparent", color: selectedFolder === null ? t.accentText : t.textMuted }}>
-                  All Tasks
-                </button>
-                {folders.map(f => (
-                  <button key={f.id} onClick={() => setSelectedFolder(f.id)} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+          <div className="mt-6">
+            <div className="flex items-center justify-between px-1 mb-2">
+              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Folders</p>
+              <button onClick={() => { setNewFolderName(""); setShowCreateFolderModal(true); }}
+                className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
+                style={{ background: t.accent, color: t.accentText }}>+</button>
+            </div>
+            <div className="space-y-1">
+              <button onClick={() => setSelectedFolder(null)} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+                style={{ background: selectedFolder === null ? t.accent : "transparent", color: selectedFolder === null ? t.accentText : t.textMuted }}>
+                All Tasks
+              </button>
+              {folders.map(f => (
+                <div key={f.id} className="group relative flex items-center rounded-xl overflow-hidden">
+                  <button onClick={() => setSelectedFolder(f.id)} className="flex-1 flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all min-w-0"
                     style={{ background: selectedFolder === f.id ? t.accent : "transparent", color: selectedFolder === f.id ? t.accentText : t.textMuted }}>
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: f.color ?? t.accent }} />
                     <span className="truncate">{f.name}</span>
                   </button>
-                ))}
-              </div>
+                  {f.owner === userId && (
+                    <button onClick={e => { e.stopPropagation(); deleteFolder(f.id, f.name); }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-2 flex-shrink-0 text-xs"
+                      style={{ color: t.danger }}>🗑</button>
+                  )}
+                </div>
+              ))}
             </div>
-          )}
+          </div>
 
         </div>
         <div className="p-6" style={{ borderTop: `1px solid ${t.border}` }}>
@@ -755,7 +804,7 @@ function DashboardContent() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center gap-2 flex-wrap">
-                <select value={sortBy} onChange={e => setSortBy(e.target.value)} className="text-sm px-3 py-2 rounded-xl outline-none" style={inputStyle}>
+                <select value={sortBy} onChange={e => handleSortChange(e.target.value)} className="text-sm px-3 py-2 rounded-xl outline-none" style={inputStyle}>
                   <option value="added">Sort: Added</option>
                   <option value="due">Sort: Due Date</option>
                   <option value="alpha">Sort: A–Z</option>
@@ -959,10 +1008,13 @@ function DashboardContent() {
                   <button type="button" className="w-11 rounded-xl font-bold text-lg" style={{ background: t.surfaceHover, color: t.accent }} onClick={async () => { const name = prompt("New category name:"); if (name) await addCustomCategory(name); }}>+</button>
                 </div>
               </div>
-              <select className="w-full px-4 py-3 rounded-xl outline-none text-sm" style={inputStyle} value={newTaskFolder || ""} onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
-                <option value="">No Folder</option>
-                {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+              <div className="flex gap-1">
+                <select className="flex-1 px-4 py-3 rounded-xl outline-none text-sm" style={inputStyle} value={newTaskFolder || ""} onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}>
+                  <option value="">No Folder</option>
+                  {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+                <button type="button" className="w-11 rounded-xl font-bold text-lg flex-shrink-0" style={{ background: t.surfaceHover, color: t.accent }} onClick={() => { setNewFolderName(""); setShowCreateFolderModal(true); }} title="New Folder">+</button>
+              </div>
               <select className="w-full px-4 py-3 rounded-xl outline-none text-sm" style={inputStyle} value={newStatus} onChange={e => setNewStatus(e.target.value as Status)}>
                 <option value="not_started">Not Started</option>
                 <option value="in_progress">In Progress</option>

@@ -61,6 +61,7 @@ function NotesContent() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [showWikiModal, setShowWikiModal] = useState(false);
+  const [sortNotes, setSortNotes] = useState<"updated" | "created" | "alpha">("updated");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedNoteRef = useRef<Note | null>(null);
@@ -175,7 +176,27 @@ function NotesContent() {
 
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/login"); };
   const getInitials = () => displayName.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
-  const filteredNotes = notes.filter(n => n.title.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  const getContentPreview = (content: any): string => {
+    if (!content || typeof content !== "object") return "";
+    const extractText = (node: any): string => {
+      if (node.type === "text") return node.text ?? "";
+      if (node.content) return node.content.map(extractText).join(" ");
+      return "";
+    };
+    return extractText(content).replace(/\s+/g, " ").trim().slice(0, 80);
+  };
+
+  const filteredNotes = notes
+    .filter(n => {
+      const q = searchQuery.toLowerCase();
+      return !q || n.title.toLowerCase().includes(q) || getContentPreview(n.content).toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (sortNotes === "alpha") return (a.title || "Untitled").localeCompare(b.title || "Untitled");
+      if (sortNotes === "created") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
 
   // Auto-select note from URL param
   useEffect(() => {
@@ -221,6 +242,7 @@ function NotesContent() {
     .fade-in { animation: fadeIn 0.2s ease-out; }
     .modal-in { animation: modalIn 0.2s ease-out; }
     ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
+    .line-clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   `;
 
   if (!authReady) return (
@@ -285,30 +307,42 @@ function NotesContent() {
       <div className="flex h-[calc(100vh-73px)]">
         {/* NOTES LIST PANEL */}
         <div className="w-72 flex-shrink-0 flex flex-col overflow-hidden" style={{ background: t.surface, borderRight: `1px solid ${t.border}` }}>
-          <div className="p-4 flex flex-col gap-3" style={{ borderBottom: `1px solid ${t.border}` }}>
+          <div className="p-4 flex flex-col gap-2" style={{ borderBottom: `1px solid ${t.border}` }}>
             <button onClick={createNote} className="w-full py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2"
               style={{ background: t.accent, color: t.accentText }}>
               + New Note
             </button>
             <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search notes…"
               className="w-full px-3 py-2 rounded-xl text-sm outline-none" style={{ background: t.surfaceHover, color: t.text, border: `1px solid ${t.border}` }} />
+            <div className="flex gap-1">
+              {([["updated","Recent"],["created","Newest"],["alpha","A–Z"]] as [typeof sortNotes, string][]).map(([val, label]) => (
+                <button key={val} onClick={() => setSortNotes(val)}
+                  className="flex-1 py-1 rounded-lg text-xs font-semibold"
+                  style={{ background: sortNotes === val ? t.accent : t.surfaceHover, color: sortNotes === val ? t.accentText : t.textMuted }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-2">
             {filteredNotes.length === 0 ? (
               <div className="py-12 text-center">
                 <div className="text-3xl mb-2">📝</div>
                 <p className="text-xs" style={{ color: t.textDim }}>{searchQuery ? "No results" : "No notes yet"}</p>
+                {!searchQuery && <button onClick={createNote} className="mt-3 text-xs font-semibold" style={{ color: t.accent }}>Create your first note →</button>}
               </div>
             ) : filteredNotes.map(note => {
               const isSelected = selectedNote?.id === note.id;
               const linkedT = tasks.find(tk => tk.id === note.task_id);
+              const preview = getContentPreview(note.content);
               return (
                 <div key={note.id} onClick={() => selectNote(note)}
                   className="p-3 rounded-xl mb-1 cursor-pointer group relative"
                   style={{ background: isSelected ? t.accent + "20" : "transparent", border: `1px solid ${isSelected ? t.accent + "60" : "transparent"}` }}>
                   <div className="text-sm font-semibold truncate pr-6" style={{ color: isSelected ? t.accent : t.text }}>{note.title || "Untitled"}</div>
-                  {linkedT && <div className="text-xs mt-0.5 truncate" style={{ color: t.textDim }}>📌 {linkedT.text}</div>}
-                  <div className="text-xs mt-0.5" style={{ color: t.textDim }}>{new Date(note.updated_at).toLocaleDateString()}</div>
+                  {preview && <div className="text-xs mt-0.5 line-clamp-2 leading-snug" style={{ color: t.textDim }}>{preview}</div>}
+                  {linkedT && <div className="text-xs mt-1 truncate" style={{ color: t.textDim }}>📌 {linkedT.text}</div>}
+                  <div className="text-xs mt-1" style={{ color: t.textDim }}>{new Date(note.updated_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</div>
                   <button onClick={e => { e.stopPropagation(); deleteNote(note.id); }}
                     className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ background: t.danger + "20", color: t.danger }}>✕</button>
@@ -316,8 +350,9 @@ function NotesContent() {
               );
             })}
           </div>
-          <div className="p-3 text-center text-xs" style={{ borderTop: `1px solid ${t.border}`, color: t.textDim }}>
-            {notes.length} note{notes.length !== 1 ? "s" : ""}
+          <div className="p-3 flex items-center justify-between text-xs" style={{ borderTop: `1px solid ${t.border}`, color: t.textDim }}>
+            <span>{notes.length} note{notes.length !== 1 ? "s" : ""}</span>
+            {searchQuery && <span>{filteredNotes.length} result{filteredNotes.length !== 1 ? "s" : ""}</span>}
           </div>
         </div>
 

@@ -19,6 +19,7 @@ interface Task {
   category: string;
   categoryId: number | null;
   folderId?: number | null;
+  taskUserId?: string;
   isRecurring?: boolean;
   recurringFrequency?: RecurringFrequency | null;
   recurringDays?: string[];
@@ -287,6 +288,7 @@ function DashboardContent() {
         status: row.status as Status, created: new Date(row.created_at).getTime(),
         priority: intToPriority(row.priority), category: catMap.get(row.category_id) ?? "Other",
         categoryId: row.category_id, folderId: row.folder_id ?? null,
+        taskUserId: row.user_id,
         isRecurring: row.is_recurring ?? false, recurringFrequency: row.recurring_frequency ?? null,
         recurringDays: row.recurring_days ?? [],
       })));
@@ -415,7 +417,7 @@ function DashboardContent() {
     } else {
       const { data, error } = await supabase.from("tasks_v2").insert(payload).select("id, created_at").single();
       if (error) { alert(error.message); return; }
-      setTasks(prev => [{ id: data.id, text: payload.title, description: payload.description ?? "", due: payload.due_date ?? "No date", done: false, status: newStatus, created: new Date(data.created_at).getTime(), priority: newPriority, category: newCategory, categoryId: newCategoryId, folderId: newTaskFolder }, ...prev]);
+      setTasks(prev => [{ id: data.id, text: payload.title, description: payload.description ?? "", due: payload.due_date ?? "No date", done: false, status: newStatus, created: new Date(data.created_at).getTime(), priority: newPriority, category: newCategory, categoryId: newCategoryId, folderId: newTaskFolder, taskUserId: user.id }, ...prev]);
     }
     resetForm(); setShowModal(false);
   };
@@ -738,7 +740,7 @@ function DashboardContent() {
                   </button>
                   {f.owner === userId && (
                     <button onClick={e => { e.stopPropagation(); deleteFolder(f.id, f.name); }}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-2 flex-shrink-0 text-xs"
+                      className="px-2 py-2 flex-shrink-0 text-xs opacity-50 hover:opacity-100 transition-opacity"
                       style={{ color: t.danger }}>🗑</button>
                   )}
                 </div>
@@ -876,57 +878,63 @@ function DashboardContent() {
                                   </select>
                                 )}
 
-  {/* Edit */}
-  <div className="relative group">
-    <button
-      onClick={() => handleEdit(task)}
-      className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
-      style={{ background: t.surfaceHover, color: t.textMuted }}
-    >
-      ✎
-    </button>
-    <div
-      className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
-      style={{ background: t.text, color: t.bg }}
-    >
-      Edit
-    </div>
-  </div>
+  {task.taskUserId === userId || !task.taskUserId ? (
+    <>
+      {/* Edit */}
+      <div className="relative group">
+        <button
+          onClick={() => handleEdit(task)}
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
+          style={{ background: t.surfaceHover, color: t.textMuted }}
+        >
+          ✎
+        </button>
+        <div
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
+          style={{ background: t.text, color: t.bg }}
+        >
+          Edit
+        </div>
+      </div>
 
-  {/* Archive */}
-  <div className="relative group">
-    <button
-      onClick={() => archiveTask(task.id)}
-      className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
-      style={{ background: t.surfaceHover, color: t.textMuted }}
-      title="Archive"
-    >
-      📦
-    </button>
-    <div
-      className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
-      style={{ background: t.text, color: t.bg }}
-    >
-      Archive
-    </div>
-  </div>
+      {/* Archive */}
+      <div className="relative group">
+        <button
+          onClick={() => archiveTask(task.id)}
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
+          style={{ background: t.surfaceHover, color: t.textMuted }}
+          title="Archive"
+        >
+          📦
+        </button>
+        <div
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
+          style={{ background: t.text, color: t.bg }}
+        >
+          Archive
+        </div>
+      </div>
 
-  {/* Delete */}
-  <div className="relative group">
-    <button
-      onClick={() => deleteTask(task.id)}
-      className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
-      style={{ background: t.surfaceHover, color: t.danger }}
-    >
-      🗑
-    </button>
-    <div
-      className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
-      style={{ background: t.text, color: t.bg }}
-    >
-      Delete
-    </div>
-  </div>
+      {/* Delete */}
+      <div className="relative group">
+        <button
+          onClick={() => deleteTask(task.id)}
+          className="w-10 h-10 rounded-xl flex items-center justify-center text-base hover:scale-105 transition-all"
+          style={{ background: t.surfaceHover, color: t.danger }}
+        >
+          🗑
+        </button>
+        <div
+          className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 rounded-md text-xs opacity-0 group-hover:opacity-100 group-hover:-translate-y-1 transition-all duration-150 whitespace-nowrap shadow-lg pointer-events-none"
+          style={{ background: t.text, color: t.bg }}
+        >
+          Delete
+        </div>
+      </div>
+    </>
+  ) : (
+    <span className="text-xs px-2 py-1 rounded-lg" style={{ background: t.surfaceHover, color: t.textDim }}>Shared</span>
+  )}
 </div>
                               </div>
                             </div>

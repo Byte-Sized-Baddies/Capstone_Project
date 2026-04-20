@@ -162,7 +162,13 @@ function DashboardContent() {
     setSortBy(value);
     localStorage.setItem(`sortBy_${selectedFolder ?? "all"}`, value);
   };
-  const [dailyGoal] = useState(5);
+  const [dailyGoal, setDailyGoal] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("dailyGoal");
+      return saved ? parseInt(saved, 10) : 5;
+    }
+    return 5;
+  });
   const [confettiTrigger, setConfettiTrigger] = useState<{ key: number; big: boolean } | null>(null);
 
   const searchRef = useRef<HTMLInputElement | null>(null);
@@ -343,6 +349,12 @@ function DashboardContent() {
 
   useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
+
+  useEffect(() => {
+    if (!userId) return;
+    const saved = localStorage.getItem("dailyGoal");
+    if (saved) setDailyGoal(parseInt(saved, 10));
+  }, [userId]);
 
   // Restore sort preference when folder changes
   useEffect(() => {
@@ -658,13 +670,8 @@ function DashboardContent() {
   .fade-in { animation: fadeIn 0.25s ease-out forwards; }
   .modal-in { animation: modalIn 0.22s ease-out forwards; }
 
-  .task-card {
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-  }
-
-  .task-card:hover {
-    transform: translateY(-1px);
-  }
+  .task-card { transition: transform 0.1s ease, box-shadow 0.1s ease; }
+  .task-card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
 
   ::-webkit-scrollbar { width: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
@@ -716,7 +723,7 @@ function DashboardContent() {
           </div>
           <nav className="space-y-1 mb-8">
             {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
                 <span>{item.icon}</span><span>{item.label}</span>
               </a>
@@ -791,12 +798,12 @@ function DashboardContent() {
 
         <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
           <div className="mb-8 slide-up">
-            <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>DO BEE</div>
+            <div className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>DO BEE</div>
             <h1 className="text-3xl font-bold mb-1" style={{ color: t.text }}>{activeFolderName}</h1>
             {selectedFolder && <p className="text-sm" style={{ color: t.textDim }}>{folders.find(f => f.id === selectedFolder)?.owner === userId ? "Your folder" : "Shared with you"}</p>}
             <div className="mt-5 p-5 rounded-2xl flex items-center justify-between" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Daily Nectar</div>
+                <div className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Daily Nectar</div>
                 <div className="text-2xl font-bold">
                   <span style={{ color: t.accent }}>{completedCount}</span>
                   <span className="text-lg font-normal" style={{ color: t.textDim }}>/{dailyGoal}</span>
@@ -828,7 +835,7 @@ function DashboardContent() {
               </div>
 
               <div>
-                <div className="text-sm font-semibold mb-3" style={{ color: t.textDim }}>Your Tasks</div>
+                <div className="text-base font-semibold mb-3" style={{ color: t.textDim }}>Your Tasks</div>
                 {filteredSorted.length === 0 ? (
                   <div className="py-16 text-center rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
                     <div className="text-3xl mb-3">🐝</div>
@@ -952,7 +959,7 @@ function DashboardContent() {
 
             <div className="space-y-4">
               <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Task Status</div>
+                <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Task Status</div>
                 <div className="space-y-3">
                   {[{ label: "Completed", count: completedCount, color: t.success }, { label: "In Progress", count: inProgressCount, color: t.accent }, { label: "Not Started", count: notStartedCount, color: t.textMuted }].map(({ label, count, color }) => (
                     <div key={label} className="flex items-center justify-between p-3 rounded-xl" style={{ background: t.surfaceHover }}>
@@ -966,7 +973,7 @@ function DashboardContent() {
                 </div>
               </div>
               <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-                <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Summary</div>
+                <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Summary</div>
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
                     <div className="text-2xl font-bold" style={{ color: t.accent }}>{total}</div>

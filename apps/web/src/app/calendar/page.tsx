@@ -863,7 +863,7 @@ export default function CalendarPage() {
               <a
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{
                   background: item.active ? t.accent : "transparent",
                   color: item.active ? t.accentText : t.textMuted,
@@ -916,7 +916,7 @@ export default function CalendarPage() {
             <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>
               DO BEE
             </div>
-            <div className="text-lg font-bold" style={{ color: t.text }}>
+            <div className="text-xl font-bold" style={{ color: t.text }}>
               Calendar
             </div>
           </div>
@@ -1052,7 +1052,7 @@ export default function CalendarPage() {
                   {selectedDate ? formatDate(selectedDate) : "Tasks"}
                 </div>
 
-                <h2 className="text-lg font-bold" style={{ color: t.text }}>
+                <h2 className="text-xl font-bold" style={{ color: t.text }}>
                   {selectedTask
                     ? selectedTask.text
                     : selectedDate

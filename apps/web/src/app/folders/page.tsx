@@ -293,7 +293,7 @@ export default function FoldersPage() {
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
                 <span>{item.icon}</span><span>{item.label}</span>
               </a>
@@ -314,7 +314,7 @@ export default function FoldersPage() {
           <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
-            <div className="text-lg font-bold" style={{ color: t.text }}>Folders</div>
+            <div className="text-xl font-bold" style={{ color: t.text }}>Folders</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -509,7 +509,7 @@ function FolderTile({ folder, t, onView, onEdit, onShare, onDelete, onLeave }: {
               {folder.isOwner ? "📁" : "🤝"}
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-base truncate" style={{ color: t.text }}>{folder.name}</h3>
+              <h3 className="font-bold text-lg truncate" style={{ color: t.text }}>{folder.name}</h3>
               <p className="text-xs" style={{ color: t.textDim }}>
                 {folder.taskCount} task{folder.taskCount !== 1 ? "s" : ""}
                 {folder.isOwner && folder.collaborators.length > 0 && ` · ${folder.collaborators.length} member${folder.collaborators.length !== 1 ? "s" : ""}`}

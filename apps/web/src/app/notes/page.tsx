@@ -284,7 +284,7 @@ function NotesContent() {
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
                 <span>{item.icon}</span><span>{item.label}</span>
               </a>
@@ -304,7 +304,7 @@ function NotesContent() {
           <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
-            <div className="text-lg font-bold" style={{ color: t.text }}>Notes</div>
+            <div className="text-xl font-bold" style={{ color: t.text }}>Notes</div>
           </div>
         </div>
         <div className="flex items-center gap-3">

@@ -54,6 +54,7 @@ export default function ArchivePage() {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [actionLoading, setActionLoading] = useState(false);
   const [sortBy, setSortBy] = useState<"newest" | "oldest" | "alpha">("newest");
+  const [priorityFilter, setPriorityFilter] = useState<"All" | "High" | "Medium" | "Low">("All");
 
   useEffect(() => { const saved = localStorage.getItem("theme"); if (saved) setIsDark(saved === "dark"); }, []);
   const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
@@ -174,13 +175,16 @@ export default function ArchivePage() {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    let result = tasks.filter(t => !q || `${t.text} ${t.description} ${t.category}`.toLowerCase().includes(q));
+    let result = tasks.filter(t =>
+      (!q || `${t.text} ${t.description} ${t.category}`.toLowerCase().includes(q)) &&
+      (priorityFilter === "All" || t.priority === priorityFilter)
+    );
     return result.sort((a, b) => {
       if (sortBy === "newest") return b.created - a.created;
       if (sortBy === "oldest") return a.created - b.created;
       return a.text.localeCompare(b.text);
     });
-  }, [tasks, search, sortBy]);
+  }, [tasks, search, sortBy, priorityFilter]);
 
   const priorityColors = (priority: Priority) => isDark ? {
     High: { bg: "#ef444430", text: "#f87171", dot: "#ef4444" },
@@ -191,6 +195,17 @@ export default function ArchivePage() {
     Medium: { bg: "#fef9c3", text: "#a16207", dot: "#eab308" },
     Low: { bg: "#dcfce7", text: "#15803d", dot: "#22c55e" },
   }[priority];
+
+  const timeAgo = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const days = Math.floor((now.getTime() - d.getTime()) / 86400000);
+    if (days === 0) return "today";
+    if (days === 1) return "yesterday";
+    if (days < 30) return `${days}d ago`;
+    const months = Math.floor(days / 30);
+    return months === 1 ? "1mo ago" : `${months}mo ago`;
+  };
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -234,7 +249,7 @@ export default function ArchivePage() {
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
                 <span>{item.icon}</span><span>{item.label}</span>
               </a>
@@ -255,7 +270,7 @@ export default function ArchivePage() {
           <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
-            <div className="text-lg font-bold" style={{ color: t.text }}>Archive</div>
+            <div className="text-xl font-bold" style={{ color: t.text }}>Archive</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -284,7 +299,7 @@ export default function ArchivePage() {
         <div className="flex items-center gap-3 mb-5 flex-wrap">
           <div className="flex items-center gap-2 px-3 py-2 rounded-xl flex-1 min-w-48" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke={t.textDim} strokeWidth="2" /><path d="M20 20l-3-3" stroke={t.textDim} strokeWidth="2" strokeLinecap="round" /></svg>
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search archived tasks..." className="bg-transparent outline-none text-sm flex-1" style={{ color: t.text }} />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search archived tasks..." className="bg-transparent outline-none text-base flex-1" style={{ color: t.text }} />
             {search && <button onClick={() => setSearch("")} style={{ color: t.textDim, fontSize: 12 }}>✕</button>}
           </div>
           <select value={sortBy} onChange={e => setSortBy(e.target.value as any)} className="px-3 py-2 rounded-xl text-sm outline-none" style={{ background: t.surface, color: t.text, border: `1px solid ${t.border}` }}>
@@ -292,6 +307,15 @@ export default function ArchivePage() {
             <option value="oldest">Oldest first</option>
             <option value="alpha">A–Z</option>
           </select>
+          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+            {(["All", "High", "Medium", "Low"] as const).map(p => (
+              <button key={p} onClick={() => setPriorityFilter(p)}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium transition-all"
+                style={{ background: priorityFilter === p ? t.accent : "transparent", color: priorityFilter === p ? t.accentText : t.textMuted }}>
+                {p}
+              </button>
+            ))}
+          </div>
           {selected.size > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-xs font-medium px-2" style={{ color: t.textMuted }}>{selected.size} selected</span>
@@ -345,7 +369,7 @@ export default function ArchivePage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="font-semibold text-sm line-through truncate" style={{ color: t.textMuted }}>{task.text}</h3>
+                        <h3 className="font-semibold text-base line-through truncate" style={{ color: t.textMuted }}>{task.text}</h3>
                         {task.description && <p className="text-xs mt-0.5 truncate" style={{ color: t.textDim }}>{task.description}</p>}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
                           <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium" style={{ background: pc.bg, color: pc.text }}>
@@ -354,7 +378,7 @@ export default function ArchivePage() {
                           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.surfaceHover, color: t.accent }}>{task.category}</span>
                           {task.due !== "No date" && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.surfaceHover, color: t.textDim }}>📅 {task.due}</span>}
                           {task.done && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.success + "20", color: t.success }}>✓ Completed</span>}
-                          {task.archivedAt && <span className="text-xs" style={{ color: t.textDim }}>Archived {new Date(task.archivedAt).toLocaleDateString()}</span>}
+                          {task.archivedAt && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: t.surfaceHover, color: t.textDim }}>📦 {timeAgo(task.archivedAt)}</span>}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0">

@@ -50,6 +50,7 @@ export default function SettingsPage() {
   const [folders, setFolders] = useState<Folder[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [notifStatus, setNotifStatus] = useState("default");
+  const [dailyGoal, setDailyGoal] = useState(5);
 
   const [editingFolderId, setEditingFolderId] = useState<number | null>(null);
   const [editingFolderName, setEditingFolderName] = useState("");
@@ -88,8 +89,10 @@ export default function SettingsPage() {
     if (!authReady) return;
     const a = localStorage.getItem("avatar");
     const n = localStorage.getItem("displayName");
+    const g = localStorage.getItem("dailyGoal");
     if (a) setAvatarDataUrl(a);
     if (n) setDisplayName(n);
+    if (g) setDailyGoal(parseInt(g, 10));
     if (typeof Notification !== "undefined") setNotifStatus(Notification.permission);
   }, [authReady]);
 
@@ -206,13 +209,16 @@ export default function SettingsPage() {
   const deleteFolder = async (folderId: number) => {
     if (!confirm("Delete this folder? Tasks inside will be moved to All Tasks.")) return;
     setFolderLoading(folderId);
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if (!user) return;
-    await supabase.from("tasks_v2").update({ folder_id: null }).eq("folder_id", folderId).eq("user_id", user.id);
-    await supabase.from("folder_members").delete().eq("folder_id", folderId);
-    const { error } = await supabase.from("folders").delete().eq("id", folderId).eq("user_id", user.id);
-    if (error) alert(`Failed to delete: ${error.message}`);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setFolderLoading(null); return; }
+    const res = await fetch("/api/delete-folder", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ folderId }),
+    });
+    const json = await res.json();
+    if (!res.ok) alert(`Failed to delete: ${json.error}`);
     else setFolders(prev => prev.filter(f => f.id !== folderId));
     setFolderLoading(null);
   };
@@ -319,7 +325,7 @@ export default function SettingsPage() {
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (
-              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+              <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>
                 <span>{item.icon}</span><span>{item.label}</span>
               </a>
@@ -340,7 +346,7 @@ export default function SettingsPage() {
           <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
           <div>
             <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
-            <div className="text-lg font-bold" style={{ color: t.text }}>Settings</div>
+            <div className="text-xl font-bold" style={{ color: t.text }}>Settings</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -355,7 +361,7 @@ export default function SettingsPage() {
 
         {/* Profile */}
         <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Profile</div>
+          <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Profile</div>
           <div className="flex items-center gap-5">
             <div className="relative flex-shrink-0">
               {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-20 h-20 rounded-full object-cover" /> :
@@ -364,7 +370,7 @@ export default function SettingsPage() {
               <input id="avatar-main" type="file" accept="image/*" className="hidden" onChange={e => onAvatarUpload(e.target.files?.[0])} />
             </div>
             <div className="flex-1">
-              <label className="text-xs font-semibold uppercase tracking-wider block mb-2" style={{ color: t.textDim }}>Display Name</label>
+              <label className="text-sm font-semibold uppercase tracking-wider block mb-2" style={{ color: t.textDim }}>Display Name</label>
               <input value={displayName} onChange={e => setDisplayName(e.target.value)} className="w-full px-4 py-3 rounded-xl text-sm" style={inputStyle} />
             </div>
           </div>
@@ -372,7 +378,7 @@ export default function SettingsPage() {
 
         {/* Appearance */}
         <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Appearance</div>
+          <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Appearance</div>
           <div className="flex items-center justify-between p-4 rounded-xl" style={{ background: t.surfaceHover }}>
             <div>
               <div className="text-sm font-semibold" style={{ color: t.text }}>{isDark ? "Dark Mode" : "Light Mode"}</div>
@@ -384,9 +390,27 @@ export default function SettingsPage() {
           </div>
         </div>
 
+        {/* Daily Goal */}
+        <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+          <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Daily Goal</div>
+          <p className="text-sm mb-4" style={{ color: t.textMuted }}>Set how many tasks you want to complete each day. Used in Dashboard and Statistics.</p>
+          <div className="flex items-center gap-4 p-4 rounded-xl" style={{ background: t.surfaceHover }}>
+            <button onClick={() => { const v = Math.max(1, dailyGoal - 1); setDailyGoal(v); localStorage.setItem("dailyGoal", String(v)); }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold"
+              style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.text }}>−</button>
+            <div className="flex-1 text-center">
+              <div className="text-3xl font-bold" style={{ color: t.accent }}>{dailyGoal}</div>
+              <div className="text-xs" style={{ color: t.textDim }}>tasks per day</div>
+            </div>
+            <button onClick={() => { const v = Math.min(50, dailyGoal + 1); setDailyGoal(v); localStorage.setItem("dailyGoal", String(v)); }}
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold"
+              style={{ background: t.surface, border: `1px solid ${t.border}`, color: t.text }}>+</button>
+          </div>
+        </div>
+
         {/* Notifications */}
         <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Notifications</div>
+          <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Notifications</div>
           <p className="text-sm mb-4" style={{ color: t.textMuted }}>Enable notifications for reminders and task completion alerts.</p>
           <div className="flex gap-3">
             <button onClick={enableNotifications}
@@ -402,7 +426,7 @@ export default function SettingsPage() {
 
         {/* Custom Categories */}
         <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-          <div className="text-xs font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Custom Categories</div>
+          <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Custom Categories</div>
           <div className="flex gap-2 mb-4">
             <input value={newCategory} onChange={e => setNewCategory(e.target.value)} onKeyDown={e => { if (e.key === "Enter") addCategory(); }} placeholder="New category name..." className="flex-1 px-4 py-2.5 rounded-xl text-sm" style={inputStyle} />
             <button onClick={addCategory} className="px-4 py-2.5 rounded-xl text-sm font-bold" style={{ background: t.accent, color: t.accentText }}>Add</button>
@@ -427,7 +451,7 @@ export default function SettingsPage() {
         {/* My Folders */}
         <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
           <div className="flex items-center justify-between mb-4">
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>My Folders</div>
+            <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>My Folders</div>
             <span className="text-xs px-2 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>{ownedFolders.length} folder{ownedFolders.length !== 1 ? "s" : ""}</span>
           </div>
           {ownedFolders.length === 0 ? (
@@ -468,7 +492,7 @@ export default function SettingsPage() {
                   {folder.expanded && (
                     <div className="slide-down p-4 space-y-4" style={{ background: t.surface, borderTop: `1px solid ${t.border}` }}>
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>Share With</div>
+                        <div className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>Share With</div>
                         <div className="flex gap-2">
                           <input value={shareEmail[folder.id] ?? ""} onChange={e => setShareEmail(prev => ({ ...prev, [folder.id]: e.target.value }))}
                             onKeyDown={e => { if (e.key === "Enter") addCollaborator(folder.id); }}
@@ -477,7 +501,7 @@ export default function SettingsPage() {
                         </div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>People with access ({folder.collaborators.length})</div>
+                        <div className="text-sm font-semibold uppercase tracking-wider mb-2" style={{ color: t.textDim }}>People with access ({folder.collaborators.length})</div>
                         {folder.collaborators.length === 0 ? (
                           <p className="text-xs py-3 text-center" style={{ color: t.textDim }}>No one else has access yet.</p>
                         ) : (
@@ -515,7 +539,7 @@ export default function SettingsPage() {
         {sharedFolders.length > 0 && (
           <div className="p-6 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
             <div className="flex items-center justify-between mb-4">
-              <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Shared With Me</div>
+              <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Shared With Me</div>
               <span className="text-xs px-2 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>{sharedFolders.length} folder{sharedFolders.length !== 1 ? "s" : ""}</span>
             </div>
             <div className="space-y-3">

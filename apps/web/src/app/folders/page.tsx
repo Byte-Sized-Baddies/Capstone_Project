@@ -180,13 +180,16 @@ export default function FoldersPage() {
   const deleteFolder = async (folder: Folder) => {
     if (!confirm(`Delete "${folder.name}"? Tasks will be moved to All Tasks.`)) return;
     setActionLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if (!user) { setActionLoading(false); return; }
-    await supabase.from("tasks_v2").update({ folder_id: null }).eq("folder_id", folder.id).eq("user_id", user.id);
-    await supabase.from("folder_members").delete().eq("folder_id", folder.id);
-    const { error } = await supabase.from("folders").delete().eq("id", folder.id).eq("user_id", user.id);
-    if (error) alert(`Failed to delete: ${error.message}`);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setActionLoading(false); return; }
+    const res = await fetch("/api/delete-folder", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ folderId: folder.id }),
+    });
+    const json = await res.json();
+    if (!res.ok) alert(`Failed to delete: ${json.error}`);
     else setFolders(prev => prev.filter(f => f.id !== folder.id));
     setActionLoading(false);
   };
@@ -566,10 +569,26 @@ function FolderTile({ folder, t, onView, onEdit, onShare, onDelete, onLeave }: {
             )}
           </div>
         )}
-        <button onClick={onView} className="mt-auto w-full py-2 rounded-xl text-xs font-bold transition-all"
-          style={{ background: folder.color + "20", color: folder.color, border: `1px solid ${folder.color}40` }}>
-          Open Folder →
-        </button>
+        <div className="mt-auto flex gap-2">
+          <button onClick={onView} className="flex-1 py-2 rounded-xl text-xs font-bold transition-all"
+            style={{ background: folder.color + "20", color: folder.color, border: `1px solid ${folder.color}40` }}>
+            Open →
+          </button>
+          {folder.isOwner && onDelete && (
+            <button onClick={onDelete} className="px-3 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{ background: t.danger + "18", color: t.danger, border: `1px solid ${t.danger}30` }}
+              title="Delete folder">
+              🗑
+            </button>
+          )}
+          {!folder.isOwner && onLeave && (
+            <button onClick={onLeave} className="px-3 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{ background: t.surfaceHover, color: t.textMuted, border: `1px solid ${t.border}` }}
+              title="Leave folder">
+              🚪
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

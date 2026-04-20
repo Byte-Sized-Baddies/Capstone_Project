@@ -364,13 +364,16 @@ function DashboardContent() {
 
   const deleteFolder = async (folderId: number, folderName: string) => {
     if (!confirm(`Delete "${folderName}"? Tasks will be unassigned from this folder.`)) return;
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData.user;
-    if (!user) return;
-    await supabase.from("tasks_v2").update({ folder_id: null }).eq("folder_id", folderId).eq("user_id", user.id);
-    await supabase.from("folder_members").delete().eq("folder_id", folderId);
-    const { error } = await supabase.from("folders").delete().eq("id", folderId).eq("user_id", user.id);
-    if (error) { alert(`Failed to delete folder: ${error.message}`); return; }
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return;
+    const res = await fetch("/api/delete-folder", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ folderId }),
+    });
+    const json = await res.json();
+    if (!res.ok) { alert(`Failed to delete folder: ${json.error}`); return; }
     setFolders(prev => prev.filter(f => f.id !== folderId));
     if (selectedFolder === folderId) setSelectedFolder(null);
   };

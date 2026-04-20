@@ -404,11 +404,12 @@ export default function TimeBlockingPage() {
     .fade-in { animation: fadeIn 0.25s ease-out forwards; }
     .modal-in { animation: modalIn 0.22s ease-out forwards; }
     .slide-up { animation: slideUp 0.3s ease-out forwards; }
-    .task-chip { transition: all 0.15s ease; cursor: grab; }
-    .task-chip:hover { transform: translateX(3px); }
-    .task-chip:active { cursor: grabbing; opacity: 0.7; }
-    .block-item { transition: box-shadow 0.15s ease; }
-    .block-item:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+    .task-chip { transition: all 0.15s ease; cursor: grab; user-select: none; }
+    .task-chip:hover { transform: translateX(3px); box-shadow: 2px 2px 12px rgba(0,0,0,0.15); }
+    .task-chip:active { cursor: grabbing; opacity: 0.6; transform: scale(0.98); }
+    .block-item { transition: box-shadow 0.15s ease, opacity 0.15s ease; }
+    .block-item:hover { box-shadow: 0 6px 24px rgba(0,0,0,0.35); }
+    .hour-row:nth-child(even) { background: ${isDark ? "rgba(255,255,255,0.012)" : "rgba(0,0,0,0.012)"}; }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { border-radius: 3px; background: ${t.borderStrong}; }
@@ -416,7 +417,7 @@ export default function TimeBlockingPage() {
     input[type="date"]::-webkit-calendar-picker-indicator { filter: ${isDark ? "invert(1)" : "none"}; }
     .block-delete-btn { opacity: 1; }
     @media (hover: hover) and (pointer: fine) {
-      .block-delete-btn { opacity: 0; }
+      .block-delete-btn { opacity: 0; transition: opacity 0.15s; }
       .group:hover .block-delete-btn { opacity: 1; }
     }
   `;
@@ -638,12 +639,12 @@ export default function TimeBlockingPage() {
             )}
             {/* Hour rows */}
             {HOURS.map(hour => (
-              <div key={hour} className="flex" style={{ height: HOUR_HEIGHT, borderBottom: `1px solid ${t.border}` }}>
+              <div key={hour} className="hour-row flex" style={{ height: HOUR_HEIGHT, borderBottom: `1px solid ${t.border}` }}>
                 <div className="w-16 flex-shrink-0 flex items-start justify-end pr-3 pt-2">
-                  <span className="text-xs font-medium" style={{ color: t.textDim }}>{formatHour(hour)}</span>
+                  <span className="text-xs font-semibold" style={{ color: hour % 6 === 0 ? t.textMuted : t.textDim, opacity: hour % 6 === 0 ? 1 : 0.7 }}>{formatHour(hour)}</span>
                 </div>
                 <div className="flex-1 relative" style={{ borderLeft: `1px solid ${t.border}` }}>
-                  <div className="absolute left-0 right-0" style={{ top: "50%", borderTop: `1px dashed ${t.border}`, opacity: 0.5 }} />
+                  <div className="absolute left-0 right-0" style={{ top: "50%", borderTop: `1px dashed ${t.border}`, opacity: 0.3 }} />
                 </div>
               </div>
             ))}
@@ -659,17 +660,23 @@ export default function TimeBlockingPage() {
                   onDragStart={e => handleBlockDragStart(e, block)}
                   onTouchStart={e => handleBlockTouchStart(e, block)}
                   style={{ top: topPx + 1, left: 68, right: 12, height: heightPx - 2, background: block.color, cursor: "grab" }}>
-                  <div className="p-2 h-full flex flex-col justify-between" style={{ background: "rgba(0,0,0,0.15)" }}>
-                    <div>
-                      <div className="text-xs font-bold truncate text-white leading-tight">{task.text}</div>
-                      {heightPx > 44 && <div className="text-xs text-white opacity-80 mt-0.5">{formatDuration(block.durationMins)}</div>}
+                  <div className="p-2 h-full flex flex-col" style={{ background: "rgba(0,0,0,0.18)" }}>
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="text-xs font-bold text-white leading-tight truncate flex-1">{task.text}</div>
                     </div>
-                    {heightPx > 56 && task.category && <div className="text-xs text-white opacity-70 truncate">{task.category}</div>}
+                    {heightPx > 40 && (
+                      <div className="text-xs text-white mt-0.5" style={{ opacity: 0.85 }}>
+                        {formatHour(block.startHour)}{block.startMin > 0 ? `:${String(block.startMin).padStart(2,"0")}` : ""} · {formatDuration(block.durationMins)}
+                      </div>
+                    )}
+                    {heightPx > 60 && task.category && (
+                      <div className="text-xs text-white mt-auto truncate" style={{ opacity: 0.7 }}>{task.category}</div>
+                    )}
                   </div>
                   <button
                     onClick={e => { e.stopPropagation(); removeBlock(block.id); }}
-                    className="block-delete-btn absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs transition-opacity"
-                    style={{ background: "rgba(0,0,0,0.4)", color: "white" }}>✕</button>
+                    className="block-delete-btn absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs"
+                    style={{ background: "rgba(0,0,0,0.45)", color: "white" }}>✕</button>
                 </div>
               );
             })}

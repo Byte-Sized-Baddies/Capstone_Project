@@ -177,6 +177,17 @@ function NotesContent() {
   const handleLogout = async () => { await supabase.auth.signOut(); router.push("/login"); };
   const getInitials = () => displayName.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 
+  const getWordCount = (content: any): number => {
+    if (!content || typeof content !== "object") return 0;
+    const extractText = (node: any): string => {
+      if (node.type === "text") return node.text ?? "";
+      if (node.content) return node.content.map(extractText).join(" ");
+      return "";
+    };
+    const text = extractText(content).trim();
+    return text ? text.split(/\s+/).length : 0;
+  };
+
   const getContentPreview = (content: any): string => {
     if (!content || typeof content !== "object") return "";
     const extractText = (node: any): string => {
@@ -367,9 +378,14 @@ function NotesContent() {
                   placeholder="Untitled"
                   className="text-3xl font-bold bg-transparent outline-none flex-1 mr-4"
                   style={{ color: t.text }} />
-                <span className="text-xs flex-shrink-0" style={{ color: t.textDim }}>
-                  {isSaving ? "Saving…" : "✓ Saved"}
-                </span>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-xs" style={{ color: t.textDim }}>
+                    {getWordCount(selectedNote.content)} words
+                  </span>
+                  <span className="text-xs flex items-center gap-1" style={{ color: isSaving ? t.accent : t.textDim }}>
+                    {isSaving ? <><span className="inline-block w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: t.accent }} />Saving…</> : "✓ Saved"}
+                  </span>
+                </div>
               </div>
               {/* Task link */}
               <div className="flex items-center gap-2 mb-3">

@@ -51,6 +51,7 @@ interface Task {
   category: string;
   categoryId: number | null;
   folderId?: number | null;
+  taskUserId?: string;
 }
 
 type Folder = {
@@ -230,7 +231,7 @@ export default function CalendarPage() {
       const { data, error } = await supabase
         .from("tasks_v2")
         .select(
-          "id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id"
+          "id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id"
         )
         .eq("user_id", user.id)
         .eq("is_archived", false);
@@ -253,6 +254,7 @@ export default function CalendarPage() {
           category: catMap.get(row.category_id) ?? "Other",
           categoryId: row.category_id,
           folderId: row.folder_id ?? null,
+          taskUserId: row.user_id,
         }))
       );
     };
@@ -314,6 +316,21 @@ export default function CalendarPage() {
       (k) => localStorage.removeItem(k)
     );
     router.push("/login");
+  };
+
+  const deleteTask = async (id: number) => {
+    if (!confirm("Delete this task permanently?")) return;
+    const { error } = await supabase.from("tasks_v2").delete().eq("id", id).eq("user_id", userId!);
+    if (error) { alert(error.message); return; }
+    setTasks(prev => prev.filter(tk => tk.id !== id));
+    setShowTaskModal(false); setSelectedTask(null);
+  };
+
+  const archiveTask = async (id: number) => {
+    const { error } = await supabase.from("tasks_v2").update({ is_archived: true }).eq("id", id).eq("user_id", userId!);
+    if (error) { alert(error.message); return; }
+    setTasks(prev => prev.filter(tk => tk.id !== id));
+    setShowTaskModal(false); setSelectedTask(null);
   };
 
   const getDaysInMonth = (date: Date) =>
@@ -468,6 +485,7 @@ export default function CalendarPage() {
         category: newCategory,
         categoryId: newCategoryId,
         folderId: newTaskFolder ?? null,
+        taskUserId: user.id,
       },
       ...prev,
     ]);
@@ -1131,17 +1149,35 @@ export default function CalendarPage() {
                   </span>
                 </div>
 
-                <button
-                  onClick={() => {
-                    setShowTaskModal(false);
-                    setSelectedTask(null);
-                    openAddModal(selectedDate);
-                  }}
-                  className="w-full py-3 rounded-xl text-sm font-bold mt-2"
-                  style={{ background: t.accent, color: t.accentText }}
-                >
-                  Add Another Task
-                </button>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    onClick={() => { setShowTaskModal(false); router.push("/dashboard"); }}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+                    style={{ background: t.accent, color: t.accentText }}
+                  >
+                    Dashboard →
+                  </button>
+                  {selectedTask.taskUserId === userId && (
+                    <>
+                      <button
+                        onClick={() => archiveTask(selectedTask.id)}
+                        className="px-3 py-2.5 rounded-xl text-sm font-medium"
+                        style={{ background: t.surfaceHover, color: t.textMuted }}
+                        title="Archive"
+                      >
+                        📦
+                      </button>
+                      <button
+                        onClick={() => deleteTask(selectedTask.id)}
+                        className="px-3 py-2.5 rounded-xl text-sm font-medium"
+                        style={{ background: t.danger + "20", color: t.danger }}
+                        title="Delete"
+                      >
+                        🗑
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             ) : selectedDate ? (
               <div>

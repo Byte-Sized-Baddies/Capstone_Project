@@ -571,11 +571,11 @@ function DashboardContent() {
 
   const tasksInView = useMemo(() => {
     if (selectedFolder === null) {
-      const ownedFolderIds = new Set(folders.filter(f => f.owner === userId).map(f => f.id));
-      return tasks.filter(tk => tk.folderId === null || ownedFolderIds.has(tk.folderId!));
+      // All Tasks: only show tasks created by the current user (no shared-folder tasks)
+      return tasks.filter(tk => !tk.taskUserId || tk.taskUserId === userId);
     }
     return tasks.filter(tk => tk.folderId === selectedFolder);
-  }, [tasks, selectedFolder, folders, userId]);
+  }, [tasks, selectedFolder, userId]);
 
   const filteredSorted = useMemo(() => {
     const q = searchQuery.toLowerCase();

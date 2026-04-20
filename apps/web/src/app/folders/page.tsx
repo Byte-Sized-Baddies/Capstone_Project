@@ -197,11 +197,16 @@ export default function FoldersPage() {
   const leaveFolder = async (folder: Folder) => {
     if (!confirm(`Leave "${folder.name}"?`)) return;
     setActionLoading(true);
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if (!user) { setActionLoading(false); return; }
-    const { error } = await supabase.from("folder_members").delete().eq("folder_id", folder.id).eq("user_id", user.id);
-    if (error) alert(`Failed to leave: ${error.message}`);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setActionLoading(false); return; }
+    const res = await fetch("/api/leave-folder", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ folderId: folder.id }),
+    });
+    const json = await res.json();
+    if (!res.ok) alert(`Failed to leave: ${json.error}`);
     else setFolders(prev => prev.filter(f => f.id !== folder.id));
     setActionLoading(false);
   };

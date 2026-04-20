@@ -226,11 +226,16 @@ export default function SettingsPage() {
   const leaveFolder = async (folderId: number) => {
     if (!confirm("Leave this shared folder?")) return;
     setFolderLoading(folderId);
-    const { data: userData } = await supabase.auth.getUser();
-    const user = userData?.user;
-    if (!user) return;
-    const { error } = await supabase.from("folder_members").delete().eq("folder_id", folderId).eq("user_id", user.id);
-    if (error) alert(`Failed to leave: ${error.message}`);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) { setFolderLoading(null); return; }
+    const res = await fetch("/api/leave-folder", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ folderId }),
+    });
+    const json = await res.json();
+    if (!res.ok) alert(`Failed to leave: ${json.error}`);
     else setFolders(prev => prev.filter(f => f.id !== folderId));
     setFolderLoading(null);
   };

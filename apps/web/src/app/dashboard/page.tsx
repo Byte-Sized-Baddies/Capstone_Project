@@ -125,6 +125,9 @@ function DashboardContent() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+  const [tasksLoaded, setTasksLoaded] = useState(false);
+  const [foldersLoaded, setFoldersLoaded] = useState(false);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -232,120 +235,121 @@ function DashboardContent() {
   }, []);
 
   useEffect(() => {
+    if (!userId) return;
+    setCategoriesLoaded(false);
     const loadCategories = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) return;
-      const { data: catRows } = await supabase.from("categories_v2").select("id, name").eq("user_id", user.id).order("id", { ascending: true });
-      if (catRows) {
-        setCategories(catRows);
-        if (catRows.length > 0) { setNewCategoryId(catRows[0].id); setNewCategory(catRows[0].name); }
+      try {
+        const { data: catRows } = await supabase.from("categories_v2").select("id, name").eq("user_id", userId).order("id", { ascending: true });
+        if (catRows) {
+          setCategories(catRows);
+          if (catRows.length > 0) { setNewCategoryId(catRows[0].id); setNewCategory(catRows[0].name); }
+        }
+      } finally {
+        setCategoriesLoaded(true);
       }
     };
     loadCategories();
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    setTasksLoaded(false);
     const loadTasks = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) return;
-      const { data: catRows } = await supabase.from("categories_v2").select("id, name").eq("user_id", user.id);
-      const catMap = new Map((catRows ?? []).map(c => [c.id, c.name]));
-      const { data: ownTasks, error: ownError } = await supabase
-        .from("tasks_v2")
-        .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id, is_recurring, recurring_frequency, recurring_days")
-        .eq("user_id", user.id)
-        .eq("is_archived", false)
-        .order("created_at", { ascending: false });
-      if (ownError) { console.error("Task load error:", ownError); return; }
-      const { data: memberRows } = await supabase.from("folder_members").select("folder_id").eq("user_id", user.id);
-      const sharedFolderIds = (memberRows ?? []).map(r => r.folder_id);
-      let sharedTasks: any[] = [];
-      if (sharedFolderIds.length > 0) {
-        const { data: shared } = await supabase
+      try {
+        const { data: catRows } = await supabase.from("categories_v2").select("id, name").eq("user_id", userId);
+        const catMap = new Map((catRows ?? []).map(c => [c.id, c.name]));
+        const { data: ownTasks, error: ownError } = await supabase
           .from("tasks_v2")
           .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id, is_recurring, recurring_frequency, recurring_days")
-          .in("folder_id", sharedFolderIds)
+          .eq("user_id", userId)
           .eq("is_archived", false)
           .order("created_at", { ascending: false });
-        sharedTasks = shared ?? [];
+        if (ownError) { console.error("Task load error:", ownError); return; }
+        const { data: memberRows } = await supabase.from("folder_members").select("folder_id").eq("user_id", userId);
+        const sharedFolderIds = (memberRows ?? []).map(r => r.folder_id);
+        let sharedTasks: any[] = [];
+        if (sharedFolderIds.length > 0) {
+          const { data: shared } = await supabase
+            .from("tasks_v2")
+            .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id, is_recurring, recurring_frequency, recurring_days")
+            .in("folder_id", sharedFolderIds)
+            .eq("is_archived", false)
+            .order("created_at", { ascending: false });
+          sharedTasks = shared ?? [];
+        }
+        // Also load tasks added by collaborators to folders I own
+        const { data: ownedFolderRows } = await supabase.from("folders").select("id").eq("user_id", userId);
+        const ownedFolderIds = (ownedFolderRows ?? []).map((r: any) => r.id);
+        let collaboratorTasks: any[] = [];
+        if (ownedFolderIds.length > 0) {
+          const { data: colTasks } = await supabase
+            .from("tasks_v2")
+            .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id, is_recurring, recurring_frequency, recurring_days")
+            .in("folder_id", ownedFolderIds)
+            .neq("user_id", userId)
+            .eq("is_archived", false)
+            .order("created_at", { ascending: false });
+          collaboratorTasks = colTasks ?? [];
+        }
+        const allRows = [...(ownTasks ?? []), ...sharedTasks, ...collaboratorTasks];
+        const seen = new Set<number>();
+        const unique = allRows.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
+        setTasks(unique.map(row => ({
+          id: row.id, text: row.title, description: row.description ?? "",
+          due: row.due_date ?? "No date", done: row.is_completed,
+          status: row.status as Status, created: new Date(row.created_at).getTime(),
+          priority: intToPriority(row.priority), category: catMap.get(row.category_id) ?? "Other",
+          categoryId: row.category_id, folderId: row.folder_id ?? null,
+          taskUserId: row.user_id,
+          isRecurring: row.is_recurring ?? false, recurringFrequency: row.recurring_frequency ?? null,
+          recurringDays: row.recurring_days ?? [],
+        })));
+      } finally {
+        setTasksLoaded(true);
       }
-      // Also load tasks added by collaborators to folders I own
-      const { data: ownedFolderRows } = await supabase.from("folders").select("id").eq("user_id", user.id);
-      const ownedFolderIds = (ownedFolderRows ?? []).map((r: any) => r.id);
-      let collaboratorTasks: any[] = [];
-      if (ownedFolderIds.length > 0) {
-        const { data: colTasks } = await supabase
-          .from("tasks_v2")
-          .select("id, title, description, due_date, is_completed, status, created_at, priority, category_id, folder_id, user_id, is_recurring, recurring_frequency, recurring_days")
-          .in("folder_id", ownedFolderIds)
-          .neq("user_id", user.id)
-          .eq("is_archived", false)
-          .order("created_at", { ascending: false });
-        collaboratorTasks = colTasks ?? [];
-      }
-      const allRows = [...(ownTasks ?? []), ...sharedTasks, ...collaboratorTasks];
-      const seen = new Set<number>();
-      const unique = allRows.filter(r => { if (seen.has(r.id)) return false; seen.add(r.id); return true; });
-      setTasks(unique.map(row => ({
-        id: row.id, text: row.title, description: row.description ?? "",
-        due: row.due_date ?? "No date", done: row.is_completed,
-        status: row.status as Status, created: new Date(row.created_at).getTime(),
-        priority: intToPriority(row.priority), category: catMap.get(row.category_id) ?? "Other",
-        categoryId: row.category_id, folderId: row.folder_id ?? null,
-        taskUserId: row.user_id,
-        isRecurring: row.is_recurring ?? false, recurringFrequency: row.recurring_frequency ?? null,
-        recurringDays: row.recurring_days ?? [],
-      })));
     };
     let channel: ReturnType<typeof supabase.channel>;
     loadTasks().then(() => {
-      supabase.auth.getUser().then(({ data }) => {
-        const user = data?.user;
-        if (!user) return;
-        channel = supabase.channel("tasks-realtime")
-          .on("postgres_changes", { event: "*", schema: "public", table: "tasks_v2", filter: `user_id=eq.${user.id}` }, () => loadTasks())
-          .subscribe();
-      });
+      channel = supabase.channel("tasks-realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "tasks_v2", filter: `user_id=eq.${userId}` }, () => loadTasks())
+        .subscribe();
     });
     return () => { if (channel) supabase.removeChannel(channel); };
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
+    setFoldersLoaded(false);
     const loadFolders = async () => {
-      const { data: userData } = await supabase.auth.getUser();
-      const user = userData?.user;
-      if (!user) return;
-      const { data: ownedRows } = await supabase.from("folders").select("id, user_id, name, color, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
-      const { data: memberRows } = await supabase.from("folder_members").select("folder_id, role").eq("user_id", user.id);
-      const sharedFolderIds = [...new Set((memberRows ?? []).map(row => row.folder_id))];
-      const ownedIds = new Set((ownedRows ?? []).map(row => row.id));
-      const onlySharedIds = sharedFolderIds.filter(id => !ownedIds.has(id));
-      let sharedRows: any[] = [];
-      if (onlySharedIds.length > 0) {
-        const { data } = await supabase.from("folders").select("id, user_id, name, color, created_at").in("id", onlySharedIds).order("created_at", { ascending: false });
-        sharedRows = data ?? [];
+      try {
+        const { data: ownedRows } = await supabase.from("folders").select("id, user_id, name, color, created_at").eq("user_id", userId).order("created_at", { ascending: false });
+        const { data: memberRows } = await supabase.from("folder_members").select("folder_id, role").eq("user_id", userId);
+        const sharedFolderIds = [...new Set((memberRows ?? []).map(row => row.folder_id))];
+        const ownedIds = new Set((ownedRows ?? []).map(row => row.id));
+        const onlySharedIds = sharedFolderIds.filter(id => !ownedIds.has(id));
+        let sharedRows: any[] = [];
+        if (onlySharedIds.length > 0) {
+          const { data } = await supabase.from("folders").select("id, user_id, name, color, created_at").in("id", onlySharedIds).order("created_at", { ascending: false });
+          sharedRows = data ?? [];
+        }
+        const allRows = [...(ownedRows ?? []), ...sharedRows];
+        setFolders(allRows.map(row => ({
+          id: row.id, name: row.name, color: row.color, owner: row.user_id,
+          collaborators: [], created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+        })));
+      } finally {
+        setFoldersLoaded(true);
       }
-      const allRows = [...(ownedRows ?? []), ...sharedRows];
-      setFolders(allRows.map(row => ({
-        id: row.id, name: row.name, color: row.color, owner: row.user_id,
-        collaborators: [], created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-      })));
     };
     let channel: ReturnType<typeof supabase.channel>;
     loadFolders().then(() => {
-      supabase.auth.getUser().then(({ data }) => {
-        const user = data?.user;
-        if (!user) return;
-        channel = supabase.channel("folders-realtime")
-          .on("postgres_changes", { event: "*", schema: "public", table: "folders", filter: `user_id=eq.${user.id}` }, () => loadFolders())
-          .on("postgres_changes", { event: "*", schema: "public", table: "folder_members", filter: `user_id=eq.${user.id}` }, () => loadFolders())
-          .subscribe();
-      });
+      channel = supabase.channel("folders-realtime")
+        .on("postgres_changes", { event: "*", schema: "public", table: "folders", filter: `user_id=eq.${userId}` }, () => loadFolders())
+        .on("postgres_changes", { event: "*", schema: "public", table: "folder_members", filter: `user_id=eq.${userId}` }, () => loadFolders())
+        .subscribe();
     });
     return () => { if (channel) supabase.removeChannel(channel); };
-  }, []);
+  }, [userId]);
 
   useEffect(() => { if (avatarDataUrl) localStorage.setItem("avatar", avatarDataUrl); }, [avatarDataUrl]);
   useEffect(() => { if (displayName) localStorage.setItem("displayName", displayName); }, [displayName]);
@@ -636,7 +640,30 @@ function DashboardContent() {
     </div>
   );
 
+  const isInitialLoading = !userId || !categoriesLoaded || !tasksLoaded || !foldersLoaded;
+
   const inputStyle = { background: t.inputBg, color: t.text, border: `1px solid ${t.border}` };
+  const skeletonStyle = { background: isDark ? "#2a2a31" : "#f6edc5" };
+
+  const SkeletonLine = ({ width = "100%", height = 12, className = "" }: { width?: number | string; height?: number; className?: string }) => (
+    <div className={`skeleton-pulse ${className}`.trim()} style={{ width, height, borderRadius: 9999, ...skeletonStyle }} />
+  );
+
+  const SkeletonTaskCard = () => (
+    <div className="p-4 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 w-6 h-6 rounded-full skeleton-pulse" style={skeletonStyle} />
+        <div className="flex-1 min-w-0">
+          <SkeletonLine width="48%" height={16} className="mb-2" />
+          <SkeletonLine width="72%" height={12} className="mb-2" />
+          <div className="flex gap-2">
+            <SkeletonLine width={74} height={22} className="rounded-full" />
+            <SkeletonLine width={108} height={22} className="rounded-full" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   const inlineStyles = `
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -666,9 +693,16 @@ function DashboardContent() {
     to { opacity: 1; transform: scale(1) translateY(0); }
   }
 
+  @keyframes skeletonPulse {
+    0% { opacity: 0.55; }
+    50% { opacity: 1; }
+    100% { opacity: 0.55; }
+  }
+
   .slide-up { animation: slideUp 0.35s ease-out forwards; }
   .fade-in { animation: fadeIn 0.25s ease-out forwards; }
   .modal-in { animation: modalIn 0.22s ease-out forwards; }
+  .skeleton-pulse { animation: skeletonPulse 1.2s ease-in-out infinite; }
 
   .task-card { transition: transform 0.1s ease, box-shadow 0.1s ease; }
   .task-card:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
@@ -798,45 +832,78 @@ function DashboardContent() {
 
         <div className="flex-1 p-6 max-w-7xl mx-auto w-full">
           <div className="mb-8 slide-up">
-            <div className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>DO BEE</div>
-            <h1 className="text-3xl font-bold mb-1" style={{ color: t.text }}>{activeFolderName}</h1>
-            {selectedFolder && <p className="text-sm" style={{ color: t.textDim }}>{folders.find(f => f.id === selectedFolder)?.owner === userId ? "Your folder" : "Shared with you"}</p>}
-            <div className="mt-5 p-5 rounded-2xl flex items-center justify-between" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-              <div>
-                <div className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Daily Nectar</div>
-                <div className="text-2xl font-bold">
-                  <span style={{ color: t.accent }}>{completedCount}</span>
-                  <span className="text-lg font-normal" style={{ color: t.textDim }}>/{dailyGoal}</span>
+            {isInitialLoading ? (
+              <>
+                <SkeletonLine width={92} height={12} className="mb-2" />
+                <SkeletonLine width={220} height={34} className="mb-2" />
+                {selectedFolder && <SkeletonLine width={120} height={14} className="mb-4" />}
+                <div className="mt-5 p-5 rounded-2xl flex items-center justify-between" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+                  <div>
+                    <SkeletonLine width={108} height={12} className="mb-3" />
+                    <SkeletonLine width={90} height={28} />
+                  </div>
+                  <div className="flex gap-2">
+                    {Array.from({ length: Math.max(4, Math.min(dailyGoal, 6)) }).map((_, i) => (
+                      <div key={i} className="w-5 h-5 rounded-full skeleton-pulse" style={skeletonStyle} />
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <NectarDots filled={Math.min(completedCount, dailyGoal)} total={dailyGoal} />
-            </div>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>DO BEE</div>
+                <h1 className="text-3xl font-bold mb-1" style={{ color: t.text }}>{activeFolderName}</h1>
+                {selectedFolder && <p className="text-sm" style={{ color: t.textDim }}>{folders.find(f => f.id === selectedFolder)?.owner === userId ? "Your folder" : "Shared with you"}</p>}
+                <div className="mt-5 p-5 rounded-2xl flex items-center justify-between" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+                  <div>
+                    <div className="text-sm font-semibold uppercase tracking-wider mb-1" style={{ color: t.textDim }}>Daily Nectar</div>
+                    <div className="text-2xl font-bold">
+                      <span style={{ color: t.accent }}>{completedCount}</span>
+                      <span className="text-lg font-normal" style={{ color: t.textDim }}>/{dailyGoal}</span>
+                    </div>
+                  </div>
+                  <NectarDots filled={Math.min(completedCount, dailyGoal)} total={dailyGoal} />
+                </div>
+              </>
+            )}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-4">
-              <div className="flex items-center gap-2 flex-wrap">
-                <select value={sortBy} onChange={e => handleSortChange(e.target.value)} className="text-sm px-3 py-2 rounded-xl outline-none" style={inputStyle}>
-                  <option value="added">Sort: Added</option>
-                  <option value="due">Sort: Due Date</option>
-                  <option value="alpha">Sort: A–Z</option>
-                </select>
-                <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }}
-                  className="text-sm px-3 py-2 rounded-xl font-medium border transition-all cursor-pointer"
-                  style={{ background: dateFilter === new Date().toISOString().split("T")[0] ? t.accent : t.surface, color: dateFilter === new Date().toISOString().split("T")[0] ? t.accentText : t.textMuted, borderColor: t.border }}>
-                  Today
-                </button>
-                <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)} className="text-sm px-3 py-2 rounded-xl outline-none" style={inputStyle}>
-                  <option value="All">All Priority</option>
-                  <option value="High">🔴 High</option>
-                  <option value="Medium">🟡 Medium</option>
-                  <option value="Low">🟢 Low</option>
-                </select>
-              </div>
+              {isInitialLoading ? (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <SkeletonLine width={120} height={38} className="rounded-xl" />
+                  <SkeletonLine width={72} height={38} className="rounded-xl" />
+                  <SkeletonLine width={138} height={38} className="rounded-xl" />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <select value={sortBy} onChange={e => handleSortChange(e.target.value)} className="text-sm px-3 py-2 rounded-xl outline-none" style={inputStyle}>
+                    <option value="added">Sort: Added</option>
+                    <option value="due">Sort: Due Date</option>
+                    <option value="alpha">Sort: A–Z</option>
+                  </select>
+                  <button onClick={() => { const today = new Date().toISOString().split("T")[0]; setDateFilter(prev => prev === today ? "" : today); }}
+                    className="text-sm px-3 py-2 rounded-xl font-medium border transition-all cursor-pointer"
+                    style={{ background: dateFilter === new Date().toISOString().split("T")[0] ? t.accent : t.surface, color: dateFilter === new Date().toISOString().split("T")[0] ? t.accentText : t.textMuted, borderColor: t.border }}>
+                    Today
+                  </button>
+                  <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value as any)} className="text-sm px-3 py-2 rounded-xl outline-none" style={inputStyle}>
+                    <option value="All">All Priority</option>
+                    <option value="High">🔴 High</option>
+                    <option value="Medium">🟡 Medium</option>
+                    <option value="Low">🟢 Low</option>
+                  </select>
+                </div>
+              )}
 
               <div>
                 <div className="text-base font-semibold mb-3" style={{ color: t.textDim }}>Your Tasks</div>
-                {filteredSorted.length === 0 ? (
+                {isInitialLoading ? (
+                  <div className="space-y-3">
+                    {Array.from({ length: 3 }).map((_, idx) => <SkeletonTaskCard key={idx} />)}
+                  </div>
+                ) : filteredSorted.length === 0 ? (
                   <div className="py-16 text-center rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
                     <div className="text-3xl mb-3">🐝</div>
                     <div className="text-sm" style={{ color: t.textDim }}>No tasks found. Time to relax or add a new one!</div>
@@ -958,40 +1025,79 @@ function DashboardContent() {
             </div>
 
             <div className="space-y-4">
-              <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-                <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Task Status</div>
-                <div className="space-y-3">
-                  {[{ label: "Completed", count: completedCount, color: t.success }, { label: "In Progress", count: inProgressCount, color: t.accent }, { label: "Not Started", count: notStartedCount, color: t.textMuted }].map(({ label, count, color }) => (
-                    <div key={label} className="flex items-center justify-between p-3 rounded-xl" style={{ background: t.surfaceHover }}>
-                      <div>
-                        <div className="text-sm font-medium" style={{ color: t.text }}>{label}</div>
-                        <div className="text-xs" style={{ color: t.textDim }}>{count} tasks</div>
-                      </div>
-                      <div className="text-xl font-bold" style={{ color }}>{total ? Math.round((count / total) * 100) : 0}%</div>
+              {isInitialLoading ? (
+                <>
+                  <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+                    <SkeletonLine width={96} height={12} className="mb-4" />
+                    <div className="space-y-3">
+                      {Array.from({ length: 3 }).map((_, idx) => (
+                        <div key={idx} className="p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                          <div className="flex items-center justify-between">
+                            <div className="space-y-2">
+                              <SkeletonLine width={88} height={12} />
+                              <SkeletonLine width={56} height={10} />
+                            </div>
+                            <SkeletonLine width={44} height={22} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-              <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
-                <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Summary</div>
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
-                    <div className="text-2xl font-bold" style={{ color: t.accent }}>{total}</div>
-                    <div className="text-xs" style={{ color: t.textDim }}>Total</div>
                   </div>
-                  <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
-                    <div className="text-2xl font-bold" style={{ color: t.success }}>{completedCount}</div>
-                    <div className="text-xs" style={{ color: t.textDim }}>Done</div>
+                  <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+                    <SkeletonLine width={78} height={12} className="mb-4" />
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      {Array.from({ length: 2 }).map((_, idx) => (
+                        <div key={idx} className="p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                          <SkeletonLine width="48%" height={26} className="mx-auto mb-2" />
+                          <SkeletonLine width="60%" height={10} className="mx-auto" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                      <SkeletonLine width="44%" height={10} className="mx-auto mb-2" />
+                      <SkeletonLine width="100%" height={8} className="rounded-full" />
+                      <SkeletonLine width={42} height={12} className="mx-auto mt-2" />
+                    </div>
                   </div>
-                </div>
-                <div className="p-3 rounded-xl" style={{ background: t.surfaceHover }}>
-                  <div className="text-xs mb-2 text-center" style={{ color: t.textDim }}>Completion Rate</div>
-                  <div className="h-2 rounded-full overflow-hidden" style={{ background: t.border }}>
-                    <div className="h-full rounded-full transition-all duration-500" style={{ width: `${total ? Math.round((completedCount / total) * 100) : 0}%`, background: t.accent }} />
+                </>
+              ) : (
+                <>
+                  <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+                    <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Task Status</div>
+                    <div className="space-y-3">
+                      {[{ label: "Completed", count: completedCount, color: t.success }, { label: "In Progress", count: inProgressCount, color: t.accent }, { label: "Not Started", count: notStartedCount, color: t.textMuted }].map(({ label, count, color }) => (
+                        <div key={label} className="flex items-center justify-between p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                          <div>
+                            <div className="text-sm font-medium" style={{ color: t.text }}>{label}</div>
+                            <div className="text-xs" style={{ color: t.textDim }}>{count} tasks</div>
+                          </div>
+                          <div className="text-xl font-bold" style={{ color }}>{total ? Math.round((count / total) * 100) : 0}%</div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="text-sm font-bold mt-1 text-center" style={{ color: t.accent }}>{total ? Math.round((completedCount / total) * 100) : 0}%</div>
-                </div>
-              </div>
+                  <div className="p-5 rounded-2xl" style={{ background: t.surface, border: `1px solid ${t.border}` }}>
+                    <div className="text-sm font-semibold uppercase tracking-wider mb-4" style={{ color: t.textDim }}>Summary</div>
+                    <div className="grid grid-cols-2 gap-3 mb-3">
+                      <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
+                        <div className="text-2xl font-bold" style={{ color: t.accent }}>{total}</div>
+                        <div className="text-xs" style={{ color: t.textDim }}>Total</div>
+                      </div>
+                      <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
+                        <div className="text-2xl font-bold" style={{ color: t.success }}>{completedCount}</div>
+                        <div className="text-xs" style={{ color: t.textDim }}>Done</div>
+                      </div>
+                    </div>
+                    <div className="p-3 rounded-xl" style={{ background: t.surfaceHover }}>
+                      <div className="text-xs mb-2 text-center" style={{ color: t.textDim }}>Completion Rate</div>
+                      <div className="h-2 rounded-full overflow-hidden" style={{ background: t.border }}>
+                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${total ? Math.round((completedCount / total) * 100) : 0}%`, background: t.accent }} />
+                      </div>
+                      <div className="text-sm font-bold mt-1 text-center" style={{ color: t.accent }}>{total ? Math.round((completedCount / total) * 100) : 0}%</div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

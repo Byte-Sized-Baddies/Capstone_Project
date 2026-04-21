@@ -98,6 +98,7 @@ export default function CalendarPage() {
   const [authReady, setAuthReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("User");
+  const [userEmail, setUserEmail] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -152,6 +153,7 @@ export default function CalendarPage() {
           "User";
 
         setDisplayName(name);
+        setUserEmail(user.email ?? "");
       } catch (e) {
         console.error("Auth check failed:", e);
       } finally {
@@ -534,7 +536,7 @@ export default function CalendarPage() {
           {DAYS.map((day) => (
             <div
               key={day}
-              className="py-3 text-center text-xs font-semibold uppercase tracking-wider"
+              className="py-3 text-center text-sm font-semibold uppercase tracking-wider"
               style={{ background: t.surface, color: t.textDim }}
             >
               {day}
@@ -565,7 +567,7 @@ export default function CalendarPage() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <span
-                    className="text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full"
+                    className="text-base font-semibold w-8 h-8 flex items-center justify-center rounded-full"
                     style={{
                       background: today ? t.accent : "transparent",
                       color: today ? t.accentText : t.text,
@@ -591,7 +593,7 @@ export default function CalendarPage() {
                     return (
                       <div
                         key={task.id}
-                        className="text-xs px-2 py-1 rounded-lg truncate font-medium"
+                        className="text-sm px-2 py-1 rounded-lg truncate font-medium"
                         style={{ background: pc.bg, color: pc.text }}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -606,7 +608,7 @@ export default function CalendarPage() {
                   })}
 
                   {dayTasks.length > 2 && (
-                    <div className="text-xs pl-1" style={{ color: t.textDim }}>
+                    <div className="text-sm pl-1" style={{ color: t.textDim }}>
                       +{dayTasks.length - 2} more
                     </div>
                   )}
@@ -638,7 +640,7 @@ export default function CalendarPage() {
                 className="py-4 px-2 text-center"
                 style={{ borderRight: idx < 6 ? `1px solid ${t.border}` : "none" }}
               >
-                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: t.textDim }}>
+                <div className="text-sm uppercase tracking-wider mb-2" style={{ color: t.textDim }}>
                   {DAYS[date.getDay()]}
                 </div>
 
@@ -654,7 +656,7 @@ export default function CalendarPage() {
 
                 {dayTasks.length > 0 && (
                   <div
-                    className="text-xs font-medium px-2 py-0.5 rounded-full mx-auto w-fit"
+                    className="text-sm font-medium px-2 py-0.5 rounded-full mx-auto w-fit"
                     style={{ background: t.accent + "25", color: t.accent }}
                   >
                     {dayTasks.length} task{dayTasks.length !== 1 ? "s" : ""}
@@ -715,7 +717,7 @@ export default function CalendarPage() {
                             />
                             <div className="min-w-0">
                               <div
-                                className="text-xs font-semibold leading-tight truncate"
+                                className="text-sm font-semibold leading-tight truncate"
                                 style={{
                                   color: pc.text,
                                   textDecoration: task.done ? "line-through" : "none",
@@ -725,13 +727,13 @@ export default function CalendarPage() {
                                 {task.text}
                               </div>
                               <div
-                                className="text-xs mt-0.5 truncate"
+                                className="text-sm mt-0.5 truncate"
                                 style={{ color: pc.text, opacity: 0.7 }}
                               >
                                 {task.category}
                               </div>
                               {task.done && (
-                                <div className="text-xs mt-0.5" style={{ color: t.success }}>
+                                <div className="text-sm mt-0.5" style={{ color: t.success }}>
                                   ✓ Done
                                 </div>
                               )}
@@ -843,8 +845,9 @@ export default function CalendarPage() {
               </div>
             )}
 
-            <div className="text-sm font-semibold" style={{ color: t.text }}>
-              {displayName}
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
+              <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>
             </div>
           </div>
 

@@ -294,7 +294,10 @@ export default function FoldersPage() {
           <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
             {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
               <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
-            <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
+              <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>
+            </div>
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (

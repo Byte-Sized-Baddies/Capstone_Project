@@ -731,7 +731,7 @@ function DashboardContent() {
           </nav>
           <div className="mt-6">
             <div className="flex items-center justify-between px-1 mb-2">
-              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Folders</p>
+              <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Folders</p>
               <button onClick={() => { setNewFolderName(""); setShowCreateFolderModal(true); }}
                 className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
                 style={{ background: t.accent, color: t.accentText }}>+</button>
@@ -787,8 +787,8 @@ function DashboardContent() {
           <div className="flex items-center gap-3">
             <button onClick={toggleTheme} className="w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer" style={{ background: t.surfaceHover, border: `1px solid ${t.border}` }}>{isDark ? "☀️" : "🌙"}</button>
             <div className="text-right">
-              <div className="text-xs font-medium" style={{ color: t.textDim }}>Today</div>
-              <div className="text-sm font-semibold" style={{ color: t.text }}>{new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
+              <div className="text-sm font-medium" style={{ color: t.textDim }}>Today</div>
+              <div className="text-base font-semibold" style={{ color: t.text }}>{new Date().toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" })}</div>
             </div>
             <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden" style={{ background: t.accent, color: t.accentText }}>
               {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-9 h-9 object-cover" /> : getInitials()}
@@ -859,13 +859,13 @@ function DashboardContent() {
                                   <h3 className={`font-semibold text-base leading-tight ${task.done ? "line-through" : ""}`} style={{ color: task.done ? t.textDim : t.text }}>{task.text}</h3>
                                   {task.description && <p className="text-sm mt-1" style={{ color: t.textDim }}>{task.description}</p>}
                                   <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium" style={{ background: pc.bg, color: pc.text }}>
+                                    <span className="inline-flex items-center gap-1.5 text-sm px-2.5 py-1 rounded-full font-medium" style={{ background: pc.bg, color: pc.text }}>
                                       <span className="w-1.5 h-1.5 rounded-full" style={{ background: pc.dot }} />{task.priority}
                                     </span>
-                                    {task.due !== "No date" && <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>📅 {task.due}</span>}
-                                    <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.accent }}>{task.category}</span>
+                                    {task.due !== "No date" && <span className="text-sm px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>📅 {task.due}</span>}
+                                    <span className="text-sm px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.accent }}>{task.category}</span>
                                     {task.isRecurring && (
-                                      <span className="text-xs px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>
+                                      <span className="text-sm px-2.5 py-1 rounded-full" style={{ background: t.surfaceHover, color: t.textMuted }}>
                                         🔁 {task.recurringFrequency === "weekly" && task.recurringDays && task.recurringDays.length > 0
                                           ? task.recurringDays.map(d => d.slice(0,3).charAt(0).toUpperCase() + d.slice(1,3)).join(", ")
                                           : task.recurringFrequency === "daily" && task.recurringDays?.[0] === "weekdays" ? "Weekdays"
@@ -964,8 +964,8 @@ function DashboardContent() {
                   {[{ label: "Completed", count: completedCount, color: t.success }, { label: "In Progress", count: inProgressCount, color: t.accent }, { label: "Not Started", count: notStartedCount, color: t.textMuted }].map(({ label, count, color }) => (
                     <div key={label} className="flex items-center justify-between p-3 rounded-xl" style={{ background: t.surfaceHover }}>
                       <div>
-                        <div className="text-sm font-medium" style={{ color: t.text }}>{label}</div>
-                        <div className="text-xs" style={{ color: t.textDim }}>{count} tasks</div>
+                        <div className="text-base font-medium" style={{ color: t.text }}>{label}</div>
+                        <div className="text-sm" style={{ color: t.textDim }}>{count} tasks</div>
                       </div>
                       <div className="text-xl font-bold" style={{ color }}>{total ? Math.round((count / total) * 100) : 0}%</div>
                     </div>
@@ -977,15 +977,15 @@ function DashboardContent() {
                 <div className="grid grid-cols-2 gap-3 mb-3">
                   <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
                     <div className="text-2xl font-bold" style={{ color: t.accent }}>{total}</div>
-                    <div className="text-xs" style={{ color: t.textDim }}>Total</div>
+                    <div className="text-sm" style={{ color: t.textDim }}>Total</div>
                   </div>
                   <div className="p-3 rounded-xl text-center" style={{ background: t.surfaceHover }}>
                     <div className="text-2xl font-bold" style={{ color: t.success }}>{completedCount}</div>
-                    <div className="text-xs" style={{ color: t.textDim }}>Done</div>
+                    <div className="text-sm" style={{ color: t.textDim }}>Done</div>
                   </div>
                 </div>
                 <div className="p-3 rounded-xl" style={{ background: t.surfaceHover }}>
-                  <div className="text-xs mb-2 text-center" style={{ color: t.textDim }}>Completion Rate</div>
+                  <div className="text-sm mb-2 text-center" style={{ color: t.textDim }}>Completion Rate</div>
                   <div className="h-2 rounded-full overflow-hidden" style={{ background: t.border }}>
                     <div className="h-full rounded-full transition-all duration-500" style={{ width: `${total ? Math.round((completedCount / total) * 100) : 0}%`, background: t.accent }} />
                   </div>

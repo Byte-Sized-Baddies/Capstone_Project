@@ -39,6 +39,7 @@ export default function IntegrationsPage() {
   const [authReady, setAuthReady] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("User");
+  const [userEmail, setUserEmail] = useState("");
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -84,6 +85,7 @@ export default function IntegrationsPage() {
           data.session.user.email?.split("@")[0] ||
           "User";
         setDisplayName(name);
+        setUserEmail(data.session.user.email ?? "");
 
         const params = new URLSearchParams(window.location.search);
         const gcalConnected = params.get("gcal");
@@ -405,8 +407,9 @@ export default function IntegrationsPage() {
                 {getInitials()}
               </div>
             )}
-            <div className="text-sm font-semibold truncate" style={{ color: t.text }}>
-              {displayName}
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
+              <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>
             </div>
           </div>
 

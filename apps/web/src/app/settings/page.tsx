@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [avatarDataUrl, setAvatarDataUrl] = useState<string | null>(null);
   const [displayName, setDisplayName] = useState("User");
+  const [userEmail, setUserEmail] = useState("");
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [folders, setFolders] = useState<Folder[]>([]);
   const [newCategory, setNewCategory] = useState("");
@@ -70,6 +71,7 @@ export default function SettingsPage() {
         const user = data.session.user;
         const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "User";
         setDisplayName(name);
+        setUserEmail(user.email ?? "");
         localStorage.setItem("displayName", name);
       } catch (e) {
         console.error("Auth check failed:", e);
@@ -325,7 +327,10 @@ export default function SettingsPage() {
               <label htmlFor="avatar-sidebar" className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer text-xs" style={{ background: t.border, color: t.textMuted }}>✎</label>
               <input id="avatar-sidebar" type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
             </div>
-            <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
+              <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>
+            </div>
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (

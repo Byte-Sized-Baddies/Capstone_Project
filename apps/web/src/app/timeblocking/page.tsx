@@ -1,4 +1,3 @@
-// app/timeblocking/page.tsx
 "use client";
 import React, { useEffect, useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
@@ -18,12 +17,38 @@ const lightTheme = {
 };
 
 type Priority = "Low" | "Medium" | "High";
-interface Task { id: number; text: string; description: string; priority: Priority; category: string; done: boolean; due: string; }
-interface TimeBlock { id: string; taskId: number; startHour: number; startMin: number; durationMins: number; color: string; }
+type Status = "not_started" | "in_progress";
+
+interface Task {
+  id: number;
+  text: string;
+  description: string;
+  priority: Priority;
+  category: string;
+  done: boolean;
+  due: string;
+  categoryId?: number | null;
+  folderId?: number | null;
+  status?: Status;
+  created?: number;
+}
+
+interface TimeBlock {
+  id: string;
+  taskId: number;
+  startHour: number;
+  startMin: number;
+  durationMins: number;
+  color: string;
+}
+
+type Category = { id: number; name: string };
+type Folder = { id: number; name: string };
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const HOUR_HEIGHT = 80;
 const intToPriority = (v: number): Priority => v === 2 ? "High" : v === 1 ? "Medium" : "Low";
+const priorityToInt = (p: Priority) => p === "Low" ? 0 : p === "Medium" ? 1 : 2;
 
 const priorityColor = (p: Priority, dark: boolean) => dark
   ? ({ High: "#ef4444", Medium: "#FFC107", Low: "#22c55e" }[p])
@@ -71,17 +96,16 @@ export default function TimeBlockingPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [blocks, setBlocks] = useState<TimeBlock[]>([]);
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  // Mobile tab state
   const [mobileTab, setMobileTab] = useState<"tasks" | "schedule">("schedule");
 
-  // Drag state (also mirrored in refs for document-level touch listeners)
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
   const [draggingBlock, setDraggingBlock] = useState<TimeBlock | null>(null);
   const [dragOverHour, setDragOverHour] = useState<number | null>(null);
   const [dragOverMin, setDragOverMin] = useState<number>(0);
 
-  // Refs for touch drag — avoids stale closures in document listeners
   const draggingTaskRef = useRef<Task | null>(null);
   const draggingBlockRef = useRef<TimeBlock | null>(null);
   const dragOverHourRef = useRef<number | null>(null);
@@ -101,13 +125,29 @@ export default function TimeBlockingPage() {
   const [showConflictModal, setShowConflictModal] = useState(false);
   const [conflictDays, setConflictDays] = useState<string[]>([]);
 
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTask, setNewTask] = useState("");
+  const [newDescription, setNewDescription] = useState("");
+  const [newDue, setNewDue] = useState(selectedDate);
+  const [newPriority, setNewPriority] = useState<Priority>("Low");
+  const [newCategory, setNewCategory] = useState("");
+  const [newCategoryId, setNewCategoryId] = useState<number | null>(null);
+  const [newStatus, setNewStatus] = useState<Status>("not_started");
+  const [newTaskFolder, setNewTaskFolder] = useState<number | null>(null);
+
   const scheduleRef = useRef<HTMLDivElement>(null);
 
-  // Keep blocksRef in sync
   useEffect(() => { blocksRef.current = blocks; }, [blocks]);
 
-  useEffect(() => { const saved = localStorage.getItem("theme"); if (saved) setIsDark(saved === "dark"); }, []);
-  const toggleTheme = () => setIsDark(prev => { localStorage.setItem("theme", !prev ? "dark" : "light"); return !prev; });
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved) setIsDark(saved === "dark");
+  }, []);
+
+  const toggleTheme = () => setIsDark(prev => {
+    localStorage.setItem("theme", !prev ? "dark" : "light");
+    return !prev;
+  });
 
   useEffect(() => {
     const checkSession = async () => {
@@ -144,24 +184,61 @@ export default function TimeBlockingPage() {
       const { data: userData } = await supabase.auth.getUser();
       const user = userData?.user;
       if (!user) return;
-      const { data: catRows } = await supabase.from("categories_v2").select("id, name").eq("user_id", user.id);
+
+      const { data: catRows } = await supabase
+        .from("categories_v2")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("id", { ascending: true });
+
       const catMap = new Map((catRows ?? []).map((c: any) => [c.id, c.name]));
+      setCategories(catRows ?? []);
+      if ((catRows ?? []).length > 0 && !newCategoryId) {
+        setNewCategoryId(catRows![0].id);
+        setNewCategory(catRows![0].name);
+      }
+
+      const { data: folderRows } = await supabase
+        .from("folders")
+        .select("id, name")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      setFolders(folderRows ?? []);
+
       const { data } = await supabase.from("tasks_v2")
-        .select("id, title, description, priority, category_id, is_completed, due_date")
-        .eq("user_id", user.id).eq("is_archived", false).order("created_at", { ascending: false });
+        .select("id, title, description, priority, category_id, is_completed, due_date, folder_id, status, created_at")
+        .eq("user_id", user.id)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: false });
+
       setTasks((data ?? []).map((row: any) => ({
-        id: row.id, text: row.title, description: row.description ?? "",
-        priority: intToPriority(row.priority), category: catMap.get(row.category_id) ?? "Other",
-        done: row.is_completed, due: row.due_date ?? "",
+        id: row.id,
+        text: row.title,
+        description: row.description ?? "",
+        priority: intToPriority(row.priority),
+        category: catMap.get(row.category_id) ?? "Other",
+        done: row.is_completed,
+        due: row.due_date ?? "",
+        categoryId: row.category_id,
+        folderId: row.folder_id ?? null,
+        status: row.status ?? "not_started",
+        created: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
       })));
     };
     load();
-  }, [authReady]);
+  }, [authReady, newCategoryId]);
 
   useEffect(() => {
     const saved = localStorage.getItem(`timeblocks_${selectedDate}`);
-    if (saved) { try { setBlocks(JSON.parse(saved)); } catch { setBlocks([]); } }
-    else setBlocks([]);
+    if (saved) {
+      try { setBlocks(JSON.parse(saved)); }
+      catch { setBlocks([]); }
+    } else setBlocks([]);
+  }, [selectedDate]);
+
+  useEffect(() => {
+    setNewDue(selectedDate);
   }, [selectedDate]);
 
   const saveBlocks = (newBlocks: TimeBlock[]) => {
@@ -176,9 +253,11 @@ export default function TimeBlockingPage() {
     router.push("/login");
   };
 
-  const getInitials = (name = displayName) => name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+  const getInitials = (name = displayName) =>
+    name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
 
-  const formatDateLabel = (dateStr: string) => new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+  const formatDateLabel = (dateStr: string) =>
+    new Date(dateStr + "T00:00:00").toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
 
   const getTaskScheduledDays = (taskId: number): string[] => {
     const days: string[] = [];
@@ -190,17 +269,97 @@ export default function TimeBlockingPage() {
       try {
         const stored = JSON.parse(localStorage.getItem(key) || "[]") as TimeBlock[];
         if (stored.some(b => b.taskId === taskId)) days.push(date);
-      } catch { /* skip */ }
+      } catch {}
     }
     return days;
   };
 
-  // ----- HTML5 drag handlers -----
+  const resetAddForm = () => {
+    setNewTask("");
+    setNewDescription("");
+    setNewDue(selectedDate);
+    setNewPriority("Low");
+    setNewStatus("not_started");
+    setNewTaskFolder(null);
+    if (categories.length > 0) {
+      setNewCategoryId(categories[0].id);
+      setNewCategory(categories[0].name);
+    } else {
+      setNewCategoryId(null);
+      setNewCategory("");
+    }
+  };
+
+  const openAddModal = () => {
+    resetAddForm();
+    setShowAddModal(true);
+  };
+
+  const handleAddTask = async () => {
+    if (!newTask.trim()) {
+      alert("Task name is required");
+      return;
+    }
+    if (!newCategoryId) {
+      alert("Please select a category");
+      return;
+    }
+
+    const { data: userData } = await supabase.auth.getUser();
+    const user = userData?.user;
+    if (!user) return;
+
+    const payload = {
+      user_id: user.id,
+      category_id: newCategoryId,
+      folder_id: newTaskFolder ?? null,
+      title: newTask.trim(),
+      description: newDescription.trim() || null,
+      due_date: newDue || null,
+      priority: priorityToInt(newPriority),
+      is_completed: false,
+      status: newStatus,
+    };
+
+    const { data, error } = await supabase
+      .from("tasks_v2")
+      .insert(payload)
+      .select("id, created_at")
+      .single();
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setTasks(prev => [
+      {
+        id: data.id,
+        text: payload.title,
+        description: payload.description ?? "",
+        priority: newPriority,
+        category: newCategory,
+        done: false,
+        due: payload.due_date ?? "",
+        categoryId: newCategoryId,
+        folderId: newTaskFolder ?? null,
+        status: newStatus,
+        created: new Date(data.created_at).getTime(),
+      },
+      ...prev,
+    ]);
+
+    setShowAddModal(false);
+    resetAddForm();
+    setMobileTab("tasks");
+  };
+
   const handleTaskDragStart = (e: React.DragEvent, task: Task) => {
     setDraggingTask(task); draggingTaskRef.current = task;
     setDraggingBlock(null); draggingBlockRef.current = null;
     e.dataTransfer.effectAllowed = "copy";
   };
+
   const handleBlockDragStart = (e: React.DragEvent, block: TimeBlock) => {
     e.stopPropagation();
     setDraggingBlock(block); draggingBlockRef.current = block;
@@ -245,8 +404,6 @@ export default function TimeBlockingPage() {
     dragOverHourRef.current = null;
   };
 
-  // ----- Touch drag handlers -----
-  // Compute snapped hour/min from a raw Y position relative to the schedule container
   const computeHourMin = useCallback((clientY: number) => {
     if (!scheduleRef.current) return { h: 9, m: 0 };
     const rect = scheduleRef.current.getBoundingClientRect();
@@ -259,8 +416,6 @@ export default function TimeBlockingPage() {
   }, []);
 
   const handleTaskTouchStart = useCallback((_e: React.TouchEvent, task: Task) => {
-    // Don't prevent default on touchstart so scroll still works when not dragging;
-    // We mark ourselves as the active drag source.
     isTouchDraggingRef.current = true;
     draggingTaskRef.current = task;
     draggingBlockRef.current = null;
@@ -277,11 +432,10 @@ export default function TimeBlockingPage() {
     setDraggingTask(null);
   }, []);
 
-  // Document-level touch listeners (attached once on mount)
   useEffect(() => {
     const onTouchMove = (e: TouchEvent) => {
       if (!isTouchDraggingRef.current) return;
-      e.preventDefault(); // prevent page scroll while dragging
+      e.preventDefault();
       const touch = e.touches[0];
       if (!scheduleRef.current) return;
       const rect = scheduleRef.current.getBoundingClientRect();
@@ -302,7 +456,6 @@ export default function TimeBlockingPage() {
       isTouchDraggingRef.current = false;
 
       const touch = e.changedTouches[0];
-      // Check if finger lifted over the schedule area
       const el = document.elementFromPoint(touch.clientX, touch.clientY);
       const scheduleEl = scheduleRef.current;
       const overSchedule = scheduleEl && (scheduleEl === el || scheduleEl.contains(el as Node));
@@ -330,11 +483,9 @@ export default function TimeBlockingPage() {
           } else {
             setShowDurationModal(true);
           }
-          // Switch to schedule tab on mobile so the block is visible
           setMobileTab("schedule");
         }
       } else {
-        // Dropped outside schedule — cancel drag
         setDraggingTask(null); draggingTaskRef.current = null;
         setDraggingBlock(null); draggingBlockRef.current = null;
       }
@@ -349,7 +500,6 @@ export default function TimeBlockingPage() {
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [computeHourMin, selectedDate]);
 
   const handleConflictChoice = (choice: "split" | "move") => {
@@ -361,7 +511,7 @@ export default function TimeBlockingPage() {
           const updated = stored.filter(b => b.taskId !== pendingTask?.id);
           if (updated.length > 0) localStorage.setItem(key, JSON.stringify(updated));
           else localStorage.removeItem(key);
-        } catch { /* skip */ }
+        } catch {}
       });
     }
     setShowConflictModal(false);
@@ -372,15 +522,24 @@ export default function TimeBlockingPage() {
     if (!pendingTask) return;
     const totalDuration = durationHrs * 60 + durationMins;
     if (totalDuration === 0) return alert("Please set a duration");
-    const newBlock: TimeBlock = { id: `${Date.now()}-${Math.random()}`, taskId: pendingTask.id, startHour: pendingHour, startMin: pendingMin, durationMins: totalDuration, color: blockColor };
+    const newBlock: TimeBlock = {
+      id: `${Date.now()}-${Math.random()}`,
+      taskId: pendingTask.id,
+      startHour: pendingHour,
+      startMin: pendingMin,
+      durationMins: totalDuration,
+      color: blockColor
+    };
     saveBlocks([...blocks, newBlock]);
-    setShowDurationModal(false); setPendingTask(null);
+    setShowDurationModal(false);
+    setPendingTask(null);
   };
 
   const removeBlock = (blockId: string) => saveBlocks(blocks.filter(b => b.id !== blockId));
 
   const goDay = (delta: number) => {
-    const d = new Date(selectedDate); d.setDate(d.getDate() + delta);
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + delta);
     setSelectedDate(d.toISOString().slice(0, 10));
   };
 
@@ -394,6 +553,12 @@ export default function TimeBlockingPage() {
   const visibleTasks = hideCompleted ? tasks.filter(t => !t.done) : tasks;
   const unscheduledTasks = visibleTasks.filter(task => !blocks.some(b => b.taskId === task.id));
   const scheduledTaskIds = new Set(blocks.map(b => b.taskId));
+
+  const inputStyle = {
+    background: t.inputBg,
+    color: t.text,
+    border: `1px solid ${t.border}`,
+  };
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
@@ -428,17 +593,26 @@ export default function TimeBlockingPage() {
     </div>
   );
 
-  // Task panel content — shared between desktop sidebar and mobile tab view
   const taskPanelContent = (
     <>
       <div className="p-4" style={{ borderBottom: `1px solid ${t.border}` }}>
         <div className="flex items-center justify-between mb-1">
           <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>Your Tasks</div>
-          <button onClick={() => setHideCompleted(p => !p)}
-            className="text-xs px-2 py-1 rounded-lg font-medium transition-colors"
-            style={{ background: hideCompleted ? t.accent + "20" : t.surfaceHover, color: hideCompleted ? t.accent : t.textDim }}>
-            {hideCompleted ? "Hide Done" : "Show All"}
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openAddModal}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold"
+              style={{ background: t.accent, color: t.accentText }}
+              aria-label="Add task"
+            >
+              +
+            </button>
+            <button onClick={() => setHideCompleted(p => !p)}
+              className="text-xs px-2 py-1 rounded-lg font-medium transition-colors"
+              style={{ background: hideCompleted ? t.accent + "20" : t.surfaceHover, color: hideCompleted ? t.accent : t.textDim }}>
+              {hideCompleted ? "Hide Done" : "Show All"}
+            </button>
+          </div>
         </div>
         <div className="text-xs" style={{ color: t.textDim }}>
           <span className="hidden md:inline">Drag tasks onto the schedule →</span>
@@ -450,7 +624,13 @@ export default function TimeBlockingPage() {
           <div className="py-12 text-center">
             <div className="text-3xl mb-2">📝</div>
             <p className="text-xs" style={{ color: t.textDim }}>No tasks yet</p>
-            <a href="/dashboard" className="text-xs font-semibold mt-2 block" style={{ color: t.accent }}>Go to Dashboard →</a>
+            <button
+              onClick={openAddModal}
+              className="text-xs font-semibold mt-2"
+              style={{ color: t.accent }}
+            >
+              Add your first task →
+            </button>
           </div>
         ) : (
           <>
@@ -508,7 +688,6 @@ export default function TimeBlockingPage() {
     <main style={{ minHeight: "100vh", background: t.bg, color: t.text, transition: "background 0.3s ease" }}>
       <style>{inlineStyles}</style>
 
-      {/* SIDEBAR */}
       <aside className="fixed inset-y-0 left-0 z-50 w-72 flex flex-col transition-transform duration-300"
         style={{ background: t.surface, borderRight: `1px solid ${t.border}`, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)" }}>
         <div className="p-6 flex-1 overflow-y-auto">
@@ -540,7 +719,6 @@ export default function TimeBlockingPage() {
 
       {sidebarOpen && <div className="fixed inset-0 z-40 bg-black/60 fade-in" onClick={() => setSidebarOpen(false)} />}
 
-      {/* HEADER */}
       <header className="sticky top-0 z-30 px-6 py-4 flex items-center justify-between"
         style={{ background: isDark ? "rgba(17,17,19,0.92)" : "rgba(255,250,243,0.92)", backdropFilter: "blur(12px)", borderBottom: `1px solid ${t.border}` }}>
         <div className="flex items-center gap-3">
@@ -558,7 +736,6 @@ export default function TimeBlockingPage() {
         </div>
       </header>
 
-      {/* MOBILE TABS — only visible on small screens */}
       <div className="md:hidden flex border-b" style={{ background: t.surface, borderColor: t.border }}>
         <button
           onClick={() => setMobileTab("tasks")}
@@ -581,7 +758,6 @@ export default function TimeBlockingPage() {
       </div>
 
       <div className="flex h-[calc(100vh-73px)] md:h-[calc(100vh-73px)]">
-        {/* TASK PANEL — hidden on mobile when schedule tab is active */}
         <div
           className={`flex-shrink-0 flex flex-col overflow-hidden slide-up
             ${mobileTab === "tasks" ? "flex w-full md:w-72" : "hidden md:flex md:w-72"}`}
@@ -589,10 +765,8 @@ export default function TimeBlockingPage() {
           {taskPanelContent}
         </div>
 
-        {/* SCHEDULE — hidden on mobile when tasks tab is active */}
         <div className={`flex-col overflow-hidden
           ${mobileTab === "schedule" ? "flex flex-1" : "hidden md:flex md:flex-1"}`}>
-          {/* Date nav */}
           <div className="px-4 md:px-6 py-3 flex items-center justify-between flex-shrink-0 flex-wrap gap-2"
             style={{ borderBottom: `1px solid ${t.border}`, background: t.bg }}>
             <div className="flex items-center gap-2 md:gap-3 min-w-0">
@@ -623,21 +797,19 @@ export default function TimeBlockingPage() {
             </div>
           </div>
 
-          {/* Hour grid */}
           <div ref={scheduleRef} className="flex-1 overflow-y-auto relative" onDragOver={handleScheduleDragOver} onDrop={handleScheduleDrop}>
-            {/* Drop indicator */}
             {(draggingTask || draggingBlock) && dragOverHour !== null && (
               <div className="absolute left-16 right-4 h-0.5 rounded-full z-20 pointer-events-none"
                 style={{ top: (dragOverHour * 60 + dragOverMin) / 60 * HOUR_HEIGHT, background: t.accent }} />
             )}
-            {/* Current time line */}
+
             {isToday && (
               <div className="absolute left-0 right-0 z-10 pointer-events-none flex items-center" style={{ top: currentMinTotal / 60 * HOUR_HEIGHT }}>
                 <div className="w-3 h-3 rounded-full ml-[52px] flex-shrink-0" style={{ background: t.danger }} />
                 <div className="flex-1 h-0.5" style={{ background: t.danger, opacity: 0.6 }} />
               </div>
             )}
-            {/* Hour rows */}
+
             {HOURS.map(hour => (
               <div key={hour} className="hour-row flex" style={{ height: HOUR_HEIGHT, borderBottom: `1px solid ${t.border}` }}>
                 <div className="w-16 flex-shrink-0 flex items-start justify-end pr-3 pt-2">
@@ -648,7 +820,7 @@ export default function TimeBlockingPage() {
                 </div>
               </div>
             ))}
-            {/* Time blocks */}
+
             {blocks.map(block => {
               const task = tasks.find(tk => tk.id === block.taskId);
               if (!task) return null;
@@ -684,7 +856,142 @@ export default function TimeBlockingPage() {
         </div>
       </div>
 
-      {/* CONFLICT MODAL */}
+      <button
+        onClick={openAddModal}
+        className="fixed bottom-8 right-8 z-40 w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold transition-all hover:scale-110 active:scale-95 shadow-2xl cursor-pointer"
+        style={{
+          background: t.accent,
+          color: t.accentText,
+          boxShadow: `0 0 30px ${t.accent}50`,
+        }}
+        aria-label="Add task"
+      >
+        +
+      </button>
+
+      {showAddModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-black/70 fade-in"
+            onClick={() => setShowAddModal(false)}
+          />
+          <div
+            className="relative w-full max-w-md rounded-3xl p-6 modal-in"
+            style={{ background: t.surface, border: `1px solid ${t.border}` }}
+          >
+            <h2 className="text-lg font-bold mb-5" style={{ color: t.text }}>
+              Add Task
+            </h2>
+
+            <div className="space-y-3">
+              <input
+                className="w-full px-4 py-3 rounded-xl outline-none text-sm"
+                style={inputStyle}
+                value={newTask}
+                onChange={e => setNewTask(e.target.value)}
+                placeholder="Task name"
+              />
+
+              <textarea
+                className="w-full px-4 py-3 rounded-xl outline-none text-sm resize-none"
+                style={inputStyle}
+                value={newDescription}
+                onChange={e => setNewDescription(e.target.value)}
+                placeholder="Description"
+                rows={2}
+              />
+
+              <input
+                type="date"
+                className="w-full px-4 py-3 rounded-xl outline-none text-sm"
+                style={inputStyle}
+                value={newDue}
+                onChange={e => setNewDue(e.target.value)}
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  className="px-4 py-3 rounded-xl outline-none text-sm"
+                  style={inputStyle}
+                  value={newPriority}
+                  onChange={e => setNewPriority(e.target.value as Priority)}
+                >
+                  <option value="Low">Low Priority</option>
+                  <option value="Medium">Medium Priority</option>
+                  <option value="High">High Priority</option>
+                </select>
+
+                <select
+                  className="px-4 py-3 rounded-xl outline-none text-sm"
+                  style={inputStyle}
+                  value={newStatus}
+                  onChange={e => setNewStatus(e.target.value as Status)}
+                >
+                  <option value="not_started">Not Started</option>
+                  <option value="in_progress">In Progress</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <select
+                  className="px-4 py-3 rounded-xl outline-none text-sm"
+                  style={inputStyle}
+                  value={newCategoryId ?? ""}
+                  onChange={e => {
+                    const id = Number(e.target.value);
+                    const cat = categories.find(c => c.id === id);
+                    setNewCategoryId(id);
+                    setNewCategory(cat?.name ?? "");
+                  }}
+                >
+                  {categories.length === 0 ? (
+                    <option value="">No categories</option>
+                  ) : (
+                    categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))
+                  )}
+                </select>
+
+                <select
+                  className="px-4 py-3 rounded-xl outline-none text-sm"
+                  style={inputStyle}
+                  value={newTaskFolder ?? ""}
+                  onChange={e => setNewTaskFolder(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">No Folder</option>
+                  {folders.map(folder => (
+                    <option key={folder.id} value={folder.id}>
+                      {folder.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowAddModal(false)}
+                  className="flex-1 py-3 rounded-xl text-sm font-medium"
+                  style={{ background: t.surfaceHover, color: t.textMuted }}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  onClick={handleAddTask}
+                  className="flex-1 py-3 rounded-xl text-sm font-bold"
+                  style={{ background: t.accent, color: t.accentText }}
+                >
+                  Save Task
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showConflictModal && pendingTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 fade-in" onClick={() => setShowConflictModal(false)} />
@@ -720,7 +1027,6 @@ export default function TimeBlockingPage() {
         </div>
       )}
 
-      {/* DURATION MODAL */}
       {showDurationModal && pendingTask && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/70 fade-in" onClick={() => setShowDurationModal(false)} />

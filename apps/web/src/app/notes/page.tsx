@@ -303,7 +303,7 @@ function NotesContent() {
         <div className="flex items-center gap-3">
           <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
+            <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
             <div className="text-xl font-bold" style={{ color: t.text }}>Notes</div>
           </div>
         </div>

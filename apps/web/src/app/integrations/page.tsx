@@ -415,7 +415,7 @@ export default function IntegrationsPage() {
               <a
                 key={item.href}
                 href={item.href}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all"
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{
                   background: item.active ? t.accent : "transparent",
                   color: item.active ? t.accentText : t.textMuted,
@@ -466,12 +466,12 @@ export default function IntegrationsPage() {
           </button>
           <div>
             <div
-              className="text-xs font-semibold uppercase tracking-wider"
+              className="text-sm font-semibold uppercase tracking-wider"
               style={{ color: t.textDim }}
             >
               DO BEE
             </div>
-            <div className="text-lg font-bold" style={{ color: t.text }}>
+            <div className="text-xl font-bold" style={{ color: t.text }}>
               Integrations
             </div>
           </div>

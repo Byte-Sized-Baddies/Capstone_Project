@@ -246,7 +246,7 @@ export default function StatisticsPage() {
           <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
             {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
               <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
-            <div className="text-sm font-semibold" style={{ color: t.text }}>{displayName}</div>
+            <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
           </div>
           <nav className="space-y-1">
             {NAV_ITEMS.map(item => (
@@ -270,7 +270,7 @@ export default function StatisticsPage() {
         <div className="flex items-center gap-3">
           <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: t.surfaceHover, color: t.textMuted }}>☰</button>
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
+            <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>DO BEE</div>
             <div className="text-xl font-bold" style={{ color: t.text }}>Statistics</div>
           </div>
         </div>

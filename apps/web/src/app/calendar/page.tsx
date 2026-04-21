@@ -913,7 +913,7 @@ export default function CalendarPage() {
           </button>
 
           <div>
-            <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>
+            <div className="text-sm font-semibold uppercase tracking-wider" style={{ color: t.textDim }}>
               DO BEE
             </div>
             <div className="text-xl font-bold" style={{ color: t.text }}>

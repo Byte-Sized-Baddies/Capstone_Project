@@ -737,13 +737,13 @@ function DashboardContent() {
                 style={{ background: t.accent, color: t.accentText }}>+</button>
             </div>
             <div className="space-y-1">
-              <button onClick={() => setSelectedFolder(null)} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
+              <button onClick={() => setSelectedFolder(null)} className="w-full flex items-center gap-2 px-4 py-2 rounded-xl text-base font-medium transition-all"
                 style={{ background: selectedFolder === null ? t.accent : "transparent", color: selectedFolder === null ? t.accentText : t.textMuted }}>
                 All Tasks
               </button>
               {folders.map(f => (
                 <div key={f.id} className="group relative flex items-center rounded-xl overflow-hidden">
-                  <button onClick={() => setSelectedFolder(f.id)} className="flex-1 flex items-center gap-2 px-4 py-2 text-sm font-medium transition-all min-w-0"
+                  <button onClick={() => setSelectedFolder(f.id)} className="flex-1 flex items-center gap-2 px-4 py-2 text-base font-medium transition-all min-w-0"
                     style={{ background: selectedFolder === f.id ? t.accent : "transparent", color: selectedFolder === f.id ? t.accentText : t.textMuted }}>
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: f.color ?? t.accent }} />
                     <span className="truncate">{f.name}</span>

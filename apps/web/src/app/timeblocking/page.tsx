@@ -708,7 +708,7 @@ export default function TimeBlockingPage() {
               <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>
             </div>
           </div>
-          <nav className="space-y-1">
+          <nav className="space-y-1 mb-8">
             {NAV_ITEMS.map(item => (
               <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>

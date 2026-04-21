@@ -555,13 +555,6 @@ function DashboardContent() {
     setNewCategory(data.name); setNewCategoryId(data.id);
   };
 
-  const onAvatarUpload = (file?: File) => {
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setAvatarDataUrl(reader.result as string);
-    reader.readAsDataURL(file);
-  };
-
   const sendNotification = useCallback((title: string, body?: string) => {
     if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
     try { new Notification(title, { body }); } catch {}
@@ -710,12 +703,8 @@ function DashboardContent() {
             </div>
           </div>
           <div className="flex items-center gap-3 mb-8 p-3 rounded-2xl" style={{ background: t.surfaceHover }}>
-            <div className="relative">
-              {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
-                <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
-              <label htmlFor="avatar-upload" className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center cursor-pointer text-xs" style={{ background: t.border, color: t.textMuted }}>✎</label>
-              <input id="avatar-upload" type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onAvatarUpload(f); }} />
-            </div>
+            {avatarDataUrl ? <img src={avatarDataUrl} alt="avatar" className="w-10 h-10 rounded-full object-cover" /> :
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm" style={{ background: t.accent, color: t.accentText }}>{getInitials()}</div>}
             <div className="flex-1 min-w-0">
               <div className="text-sm font-semibold truncate" style={{ color: t.text }}>{displayName}</div>
               <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>

@@ -413,7 +413,7 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 mb-8">
             {NAV_ITEMS.map((item) => (
               <a
                 key={item.href}

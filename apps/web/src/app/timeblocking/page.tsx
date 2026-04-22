@@ -564,6 +564,7 @@ export default function TimeBlockingPage() {
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    html { font-size: 19px; }
     * { font-family: 'DM Sans', sans-serif; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     @keyframes modalIn { from { opacity: 0; transform: scale(0.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
@@ -708,7 +709,7 @@ export default function TimeBlockingPage() {
               <div className="text-xs truncate" style={{ color: t.textDim }}>{userEmail}</div>
             </div>
           </div>
-          <nav className="space-y-1">
+          <nav className="space-y-1 mb-8">
             {NAV_ITEMS.map(item => (
               <a key={item.href} href={item.href} className="flex items-center gap-3 px-4 py-3 rounded-xl text-base font-medium transition-all"
                 style={{ background: item.active ? t.accent : "transparent", color: item.active ? t.accentText : t.textMuted }}>

@@ -10,19 +10,21 @@ import {
 import { useTasks, Task } from "../../context/tasks";
 import { useProjects } from "../../context/projects";
 import TaskList from "../../components/TaskList";
+import EditTaskModal from "../../components/EditTaskModal";
 
 type ViewMode = "5day" | "week" | "month";
 
 const GRAY = "#9CA3AF";
 
 export default function CalendarScreen() {
-    const { tasks, toggleTask } = useTasks();
+    const { tasks, toggleTask, updateTask, deleteTask } = useTasks();
     const { projects } = useProjects();
 
     const today = useMemo(() => new Date(), []);
     const [viewMode, setViewMode] = useState<ViewMode>("5day");
     const [currentDate, setCurrentDate] = useState<Date>(today);
     const [selectedDate, setSelectedDate] = useState<Date>(today);
+    const [editingTask, setEditingTask] = useState<Task | null>(null);
 
     // Map tasks -> dateKey "YYYY-MM-DD"
     const tasksByDate = useMemo(() => {
@@ -90,7 +92,6 @@ export default function CalendarScreen() {
             {/* Header */}
             <View style={styles.headerRow}>
                 <View>
-                    <Text style={styles.appName}>DO BEE</Text>
                     <Text style={styles.screenTitle}>Calendar</Text>
                 </View>
 
@@ -171,11 +172,25 @@ export default function CalendarScreen() {
                             No tasks yet. Tap the + button to add your first one.
                         </Text>
                     ) : (
-                        <TaskList tasks={tasksForSelected}
-                            onToggleTask={toggleTask} />
+                        <TaskList
+                            tasks={tasksForSelected}
+                            onToggleTask={toggleTask}
+                            onPressTask={(task) => setEditingTask(task)}
+                        />
                     )}
                 </View>
             </ScrollView>
+            {editingTask && (
+                <EditTaskModal
+                    task={editingTask}
+                    onClose={() => setEditingTask(null)}
+                    onSave={(updates) => {
+                        updateTask(editingTask.id, updates);
+                        setEditingTask(null);
+                    }}
+                    onDelete={(taskId) => deleteTask(taskId)}
+                />
+            )}
         </View>
     );
 }

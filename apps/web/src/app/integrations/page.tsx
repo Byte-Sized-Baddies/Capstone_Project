@@ -320,6 +320,7 @@ export default function IntegrationsPage() {
 
   const inlineStyles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
+    html { font-size: 19px; }
     * { font-family: 'DM Sans', sans-serif; }
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     .fade-in { animation: fadeIn 0.2s ease-out; }
@@ -413,7 +414,7 @@ export default function IntegrationsPage() {
             </div>
           </div>
 
-          <nav className="space-y-1">
+          <nav className="space-y-1 mb-8">
             {NAV_ITEMS.map((item) => (
               <a
                 key={item.href}

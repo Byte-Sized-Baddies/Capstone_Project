@@ -1021,9 +1021,9 @@ function DashboardContent() {
                 >
                   <option value="">Category...</option>
                   {categories.map(c => (
-                    <option key={c.id} value={c.id}></option>
-                    {c.name}
-                  </option>
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
                   ))}
                 </select>
 

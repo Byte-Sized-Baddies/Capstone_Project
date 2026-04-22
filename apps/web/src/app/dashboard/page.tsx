@@ -555,6 +555,50 @@ function DashboardContent() {
     setNewCategory(data.name); setNewCategoryId(data.id);
   };
 
+
+const renameCategory = async () => {
+  if (!newCategoryId) {
+    alert("Please select a category to edit");
+    return;
+  }
+
+  const current = categories.find(c => c.id === newCategoryId);
+  if (!current) return;
+
+  const name = prompt("Rename category:", current.name)?.trim();
+  if (!name) return;
+
+  const duplicate = categories.find(
+    c => c.id !== newCategoryId && c.name.toLowerCase() === name.toLowerCase()
+  );
+  if (duplicate) {
+    alert("A category with that name already exists");
+    return;
+  }
+
+  const { error } = await supabase
+    .from("categories_v2")
+    .update({ name })
+    .eq("id", newCategoryId);
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setCategories(prev =>
+    prev.map(c => (c.id === newCategoryId ? { ...c, name } : c))
+  );
+  setNewCategory(name);
+
+  setTasks(prev =>
+    prev.map(task =>
+      task.categoryId === newCategoryId ? { ...task, category: name } : task
+    )
+  );
+};
+
+
   const onAvatarUpload = (file?: File) => {
     if (!file) return;
     const reader = new FileReader();
@@ -750,7 +794,7 @@ function DashboardContent() {
                   </button>
                   {f.owner === userId && (
                     <button onClick={e => { e.stopPropagation(); deleteFolder(f.id, f.name); }}
-                      className="px-2 py-2 flex-shrink-0 text-xs opacity-50 hover:opacity-100 transition-opacity"
+                      className="w-8 h-8 flex items-center justify-center flex-shrink-0 text-lg opacity-50 hover:opacity-100 hover:scale-110 transition-all"
                       style={{ color: t.danger }}>🗑</button>
                   )}
                 </div>
@@ -1019,11 +1063,46 @@ function DashboardContent() {
                   <option value="High">High Priority</option>
                 </select>
                 <div className="flex gap-1">
-                  <select className="flex-1 px-3 py-3 rounded-xl outline-none text-sm" style={inputStyle} value={newCategoryId ?? ""} onChange={e => { const id = Number(e.target.value); const cat = categories.find(c => c.id === id); setNewCategoryId(id); setNewCategory(cat?.name ?? ""); }}>
-                    <option value="">Category...</option>
-                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <button type="button" className="w-11 rounded-xl font-bold text-lg" style={{ background: t.surfaceHover, color: t.accent }} onClick={async () => { const name = prompt("New category name:"); if (name) await addCustomCategory(name); }}>+</button>
+                  <select
+                     className="flex-1 px-3 py-3 rounded-xl outline-none text-sm"
+                     style={inputStyle}
+                     value={newCategoryId ?? ""}
+                    onChange={e => {
+                        const id = Number(e.target.value);
+                        const cat = categories.find(c => c.id === id);
+                        setNewCategoryId(id);
+                        setNewCategory(cat?.name ?? "");
+                    }}
+                >
+                  <option value="">Category...</option>
+                  {categories.map(c => (
+                    <option key={c.id} value={c.id}></option>
+                    {c.name}
+                  </option>
+                  ))}
+                </select>
+
+                <button
+                   type="button"
+                   className="w-11 rounded-xl font-bold text-lg"
+                   style={{ background: t.surfaceHover, color: t.textMuted }}
+                   onClick={renameCategory}
+                   title="Rename Category"
+                   >
+                     ✎
+                </button>
+                <button
+                  type="button"
+                  className="w-11 rounded-xl font-bold text-lg"
+                  style={{ background: t.surfaceHover, color: t.accent }}
+                  onClick={async () => {
+                    const name = prompt("New category name:");
+                    if (name) await addCustomCategory(name);
+                  }}
+                  title="New Category"
+                >
+                  +
+                   </button>
                 </div>
               </div>
               <div className="flex gap-1">

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { AuthProvider, useAuth } from "../context/auth";
 import { TasksProvider } from "../context/tasks";
 import { ProjectsProvider } from "../context/projects";
+import { NotesProvider } from "../context/notes";
 
 // This component handles the actual "Redirect" logic
 function RootNavigation() {
@@ -32,8 +33,10 @@ export default function RootLayout() {
     <AuthProvider>
       <ProjectsProvider>
         <TasksProvider>
-          {/* We use RootNavigation here so it has access to useAuth() */}
-          <RootNavigation />
+          <NotesProvider>
+            {/* We use RootNavigation here so it has access to useAuth() */}
+            <RootNavigation />
+          </NotesProvider>
         </TasksProvider>
       </ProjectsProvider>
     </AuthProvider>

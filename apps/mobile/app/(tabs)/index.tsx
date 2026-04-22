@@ -14,7 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import TaskList from "../../components/TaskList";
 import AddTaskModal from "../../components/AddTaskModal";
 import EditTaskModal from "../../components/EditTaskModal";
-import HoneyCombTracker from "../../components/HoneyCombTracker"; // 👈 Import new component
+import HoneyCombTracker from "../../components/HoneyCombTracker"; 
 
 type SortOption = "added" | "priority" | "dueDate";
 
@@ -103,10 +103,10 @@ export default function DashboardScreen() {
                 style={styles.profileMenuItem}
                 onPress={() => {
                   setProfileMenuOpen(false);
-                  router.push("/stats" as any); // Navigate to Stats
+                  router.push("/(tabs)/hive" as any);
                 }}
               >
-                <Text style={styles.profileMenuText}>My Stats 📊</Text>
+                <Text style={styles.profileMenuText}>The Hive 🐝</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

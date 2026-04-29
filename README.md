@@ -253,8 +253,8 @@ pnpm lint
 
 ## Deployment Process
 1. Clone repository
-    git clone <repo-url>
-    cd do-bee
+    git clone https://github.com/Byte-Sized-Baddies/Capstone_Project.git
+    cd Capstone_Project
 
 2. pnpm install
 

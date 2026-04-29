@@ -24,6 +24,77 @@ Project board:
 
 - https://trello.com/b/Hl6oX54Q/capstone
 
+
+## Assumptions
+The following assumptions are made for deployment:
+- The deployment environment has Node.js 20.x installed
+- The user has pnpm installed globally
+- A Supabase project is already created
+- Environment variables (API keys, database URLs) are available
+- The deployment target supports:
+    - Node-based applications
+    - Web hosting (for Next.js)
+    - Mobile build tools (optional for Expo)
+
+
+## Dependencies
+
+Core Dependencies:
+- Node.js(v20.x)
+- pnpm (latest stable)
+- Turborepo
+
+Framework & Libraries
+- Next.js 15
+- React 19
+- Expo 54
+- React Native 0.81
+
+Backend & Services:
+- Supabase (Auth, Postgres, Realtime)
+
+Internal Packages (from monorepo)
+- UI components
+- Hooks
+- Auth module
+- Data abstraction layers
+
+External APIs
+- Supabase API (required)
+- Any integrations configured in the integrations_v2 table
+
+## Constraints
+
+- Require internet access for Supabase services
+- Must support Node.js runtime
+- Mobile app requires:
+    - Expo CLI or compatible environment
+- Environment variables must be configured correctly
+- Database schema must be intialized before running
+
+## Description of Deployment Artifacts
+The project follows a monorepo structure:
+root/
+├── apps/
+│   ├── web/                # Next.js production build
+│   ├── mobile/             # Expo app build
+│   ├── supabase/           # SQL schema & migrations
+├── packages/
+│   ├── ui/
+│   ├── hooks/
+│   ├── lib/
+│   ├── data/
+│   ├── auth/
+│   ├── data-drivers/
+├── infra/                  # Deployment configs
+├── docs/                   # Documentation
+
+Deployment Artifacts Include:
+- Compiled Next.js build (.next/)
+- Database schema + migrations
+- Environment configurations files
+
+
 ## Architecture
 
 ### Monorepo Layout
@@ -58,6 +129,23 @@ Project board:
 ## Database Schema (Supabase)
 
 Primary schema source: apps/supabase/tables.sql
+
+## Data Creation
+Before running the application, the database must be initialized
+
+Steps:
+1. Set up a Supabase project
+2. Run schema file:
+    apps/supabase/tables.sql
+3. Apply migrations:
+    migration_add_folder_id_to_tasks.sql
+    migration_add_recurring_to_tasks.sql
+    migration_notes_and_integrations.sql
+
+Additional Setup:
+- Enable Row-Level Security
+- Apply policies from
+    RLS_rules.sql
 
 ### Core Tables
 
@@ -162,6 +250,41 @@ pnpm build
 ```bash
 pnpm lint
 ```
+
+## Deployment Process
+1. Clone repository
+    git clone <repo-url>
+    cd do-bee
+
+2. pnpm install
+
+3. Create .env files in relevant apps
+
+4. Setup Database
+    - Apply migrations
+    - Verify tables exist
+
+5. Build Project
+    pnpm build
+
+6.  Run All Apps
+    pnpm dev
+
+    Run Web Only 
+    pnpm --filter ./apps/web dev
+
+    Run Mobile Only
+    pnpm --filter ./apps/mobile start
+
+7. Production Deployment
+
+    Web Deployment:
+    - Deploy apps/web using:
+        - Vercel / Netlify / Node Server
+    
+    Mobile Deployment:
+    - Build using Expo
+    
 
 ## Notes
 
